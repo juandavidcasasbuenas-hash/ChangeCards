@@ -150,6 +150,7 @@ async function requestSparks(payload, force = false) {
 
 function App() {
   const [session, setSession] = useState(loadSession)
+  const [activeCardId, setActiveCardId] = useState(null)
 
   useEffect(() => {
     localStorage.setItem('change-cards-session-v1', JSON.stringify(session))
@@ -159,6 +160,7 @@ function App() {
 
   const startAgain = () => {
     const next = { ...DEFAULT_SESSION }
+    setActiveCardId(null)
     setSession(next)
     sessionStorage.removeItem('change-cards-cache-v1')
   }
@@ -167,10 +169,14 @@ function App() {
     return <Entry session={session} update={update} />
   }
 
+  const savedCards = CARDS
+    .filter((card) => session.swarm?.[card.id]?.visited)
+    .sort((a, b) => (session.swarm[b.id]?.updatedAt || 0) - (session.swarm[a.id]?.updatedAt || 0))
+
   return (
     <main className="app-shell mode-tabletop">
-      <TopBar onRestart={startAgain} />
-      <Tabletop session={session} update={update} />
+      <TopBar onRestart={startAgain} savedCards={savedCards} onOpenSaved={setActiveCardId} />
+      <Tabletop session={session} update={update} activeId={activeCardId} setActiveId={setActiveCardId} />
     </main>
   )
 }
@@ -242,10 +248,32 @@ function Logo() {
   )
 }
 
-function TopBar({ onRestart }) {
+function TopBar({ onRestart, savedCards, onOpenSaved }) {
   return (
     <header className="topbar">
-      <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
+      <div className="topbar-workshop">
+        <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
+        {savedCards.length > 0 && (
+          <nav className="saved-pins" aria-label={`${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}>
+            <span className="saved-pins-label">Saved</span>
+            <div className="saved-pins-scroll">
+              {savedCards.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={`saved-pin category-${card.category}`}
+                  onClick={() => onOpenSaved(card.id)}
+                  aria-label={`Open saved idea for ${card.title}`}
+                  title={card.title}
+                >
+                  <CardIcon id={card.id} />
+                </button>
+              ))}
+            </div>
+            <span className="saved-pins-count" aria-hidden="true">{savedCards.length}</span>
+          </nav>
+        )}
+      </div>
       <button className="text-button" onClick={onRestart}>New idea ↗</button>
     </header>
   )
@@ -261,10 +289,9 @@ function OriginalNote({ idea, compact = false }) {
   )
 }
 
-function Tabletop({ session, update }) {
+function Tabletop({ session, update, activeId, setActiveId }) {
   const canvasRef = useRef(null)
   const deckRef = useRef(null)
-  const [activeId, setActiveId] = useState(null)
   const [sparkStates, setSparkStates] = useState({})
   const [dragOverDeck, setDragOverDeck] = useState(false)
   const [mobileRearranging, setMobileRearranging] = useState(false)
@@ -462,6 +489,10 @@ function Tabletop({ session, update }) {
     }
   }
 
+  useEffect(() => {
+    if (activeCard) ensureSparks(activeCard)
+  }, [activeId])
+
   function openCard(card) {
     if (coachStep !== 'complete') {
       setCoachStep('complete')
@@ -505,8 +536,7 @@ function Tabletop({ session, update }) {
         </button>
         {coachStep === 'deck' && remainingCards.length > 0 && (
           <div className="onboarding-hint deck-onboarding-hint" role="note">
-            <i aria-hidden="true">←</i>
-            <span><strong><span className="tap-label">Tap</span><span className="click-label">Click</span> the deck</strong><small>to deal a card</small></span>
+            <span><strong><span className="tap-label">Tap the deck</span><span className="click-label">Click the deck</span></strong><small>to deal a card</small></span>
           </div>
         )}
         <p>{dragOverDeck ? 'Drop to put it back' : remainingCards.length ? `${remainingCards.length} still in the deck` : 'The whole deck is out'}</p>
@@ -870,8 +900,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
       </button>
       {showCoachmark && !visited && (
         <div className="onboarding-hint card-onboarding-hint" role="note">
-          <i aria-hidden="true">↑</i>
-          <span><strong><span className="tap-label">Tap</span><span className="click-label">Click</span> the card</strong><small>to ideate · use the grip to move</small></span>
+          <span><strong><span className="tap-label">Tap the card</span><span className="click-label">Click the card</span></strong><small>the grip below moves it</small></span>
         </div>
       )}
     </div>
@@ -1057,7 +1086,6 @@ function CardArtwork({ card }) {
       <span className="card-category">{card.label}</span>
       <span className="card-symbol" aria-hidden="true"><CardIcon id={card.id} /></span>
       <strong>{card.title}</strong>
-      <span className="card-question">{card.provocation}</span>
     </>
   )
 }
