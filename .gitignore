@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.env.*
+OpenAI.txt
+OpenAi.txt
+openAI.txt
+npm-debug.log*
+verification-*.png
