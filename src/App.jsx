@@ -505,6 +505,7 @@ function Tabletop({ session, update, activeId, setActiveId }) {
   function saveNote(card, note) {
     const cleanNote = note.trim()
     if (!cleanNote) return
+    if (import.meta.env.DEV) console.info('[change-cards:save]', { stage: 'commit', cardId: card.id, noteLength: cleanNote.length })
     update({
       swarm: {
         ...notes,
@@ -1137,7 +1138,6 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
   const [sparkPaused, setSparkPaused] = useState(false)
   const editorRef = useRef(null)
   const sparks = sparkState?.sparks || []
-  const formId = `response-form-${card.id}`
 
   useEffect(() => {
     if (window.matchMedia?.(COMPACT_TABLE_QUERY).matches) return undefined
@@ -1166,9 +1166,15 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
     }
   }, [sparks.length, sparkIndex, sparkPaused])
 
+  const saveDraft = () => {
+    if (!draft.trim()) return
+    if (import.meta.env.DEV) console.info('[change-cards:save]', { stage: 'activate', cardId: card.id, draftLength: draft.trim().length })
+    onSubmit(draft)
+  }
+
   const submit = (event) => {
     event.preventDefault()
-    onSubmit(draft)
+    saveDraft()
   }
 
   const takeSpark = (spark) => {
@@ -1180,7 +1186,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
   return (
     <div className="generation-surface">
       <button className="surface-close" type="button" onClick={onClose} aria-label="Put card back">×</button>
-      <form id={formId} className="response-workbench" onSubmit={submit}>
+      <form className="response-workbench" onSubmit={submit}>
         <div className="provocation-copy">
           <p>{card.provocation}</p>
         </div>
@@ -1192,6 +1198,12 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
           value={draft}
           maxLength={1000}
           onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault()
+              saveDraft()
+            }
+          }}
           placeholder="Start rough. One changed detail is enough…"
         />
         <div className={`spark-cloud ${sparkState?.loading ? 'is-catching' : ''}`} aria-label="AI-generated subject-specific writing prompts" aria-live="polite">
@@ -1219,7 +1231,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
         </div>
       </form>
       <div className="response-submit-dock">
-        <button className="response-submit" type="submit" form={formId} disabled={!draft.trim()}>{submitLabel}</button>
+        <button className="response-submit" type="button" onClick={saveDraft} disabled={!draft.trim()} data-card-id={card.id}>{submitLabel}</button>
       </div>
     </div>
   )

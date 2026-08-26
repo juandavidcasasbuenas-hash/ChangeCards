@@ -539,6 +539,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .active-card-scrim { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(35,30,22,.46); backdrop-filter: blur(5px); cursor: default; animation: tableDim 260ms ease both; }
 .active-card-wrap { position: relative; z-index: 1; width: min(440px, calc(100vw - 38px), calc((var(--workshop-viewport-height, 100dvh) - 50px) * 5 / 7)); animation: liftCard 520ms cubic-bezier(.18,.82,.2,1) both; }
 .active-card-wrap .change-card:not(.swarm-card).is-selected { width: 100%; margin: 0 !important; transform: none; }
+.active-card-wrap .change-card.is-selected .card-rotator { transform: none; transform-style: flat; }
+.active-card-wrap .change-card.is-selected .card-front { visibility: hidden; pointer-events: none; }
+.active-card-wrap .change-card.is-selected .card-back { transform: none; backface-visibility: visible; -webkit-backface-visibility: visible; pointer-events: auto; }
 .active-card-wrap .change-card:not(.swarm-card).is-selected .card-back { box-shadow: inset 0 8px 0 var(--card-color), 0 34px 80px rgba(23,23,19,.34); }
 @keyframes tableDim { from { opacity: 0; } }
 @keyframes liftCard { from { opacity: 0; transform: translateY(70px) scale(.8) rotate(-4deg); } }
