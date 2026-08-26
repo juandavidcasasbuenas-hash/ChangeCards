@@ -1137,6 +1137,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
   const [sparkPaused, setSparkPaused] = useState(false)
   const editorRef = useRef(null)
   const sparks = sparkState?.sparks || []
+  const formId = `response-form-${card.id}`
 
   useEffect(() => {
     if (window.matchMedia?.(COMPACT_TABLE_QUERY).matches) return undefined
@@ -1179,7 +1180,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
   return (
     <div className="generation-surface">
       <button className="surface-close" type="button" onClick={onClose} aria-label="Put card back">×</button>
-      <form className="response-workbench" onSubmit={submit}>
+      <form id={formId} className="response-workbench" onSubmit={submit}>
         <div className="provocation-copy">
           <p>{card.provocation}</p>
         </div>
@@ -1216,8 +1217,10 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
             </div>
           ) : null}
         </div>
-        <button className="response-submit" type="submit" disabled={!draft.trim()}>{submitLabel}</button>
       </form>
+      <div className="response-submit-dock">
+        <button className="response-submit" type="submit" form={formId} disabled={!draft.trim()}>{submitLabel}</button>
+      </div>
     </div>
   )
 }

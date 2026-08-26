@@ -705,10 +705,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 /* The card back is deliberately only a prompt, a page and one passing spark. */
 .change-card:not(.swarm-card).is-selected { scroll-margin-top: 230px; }
-.generation-surface { position: relative; display: block; padding: 38px 30px 25px; overflow: hidden; }
+.generation-surface { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; padding: 38px 30px 25px; overflow: hidden; }
 .surface-close { position: absolute; z-index: 3; top: 14px; right: 16px; border: 0; padding: 2px 5px; color: rgba(23,23,19,.52); background: transparent; font: 400 20px/1 'DM Sans'; cursor: pointer; transition: color 160ms ease, rotate 180ms ease; }
 .surface-close:hover { color: var(--ink); rotate: 90deg; }
-.response-workbench { display: flex; flex-direction: column; gap: 18px; height: 100%; padding: 0; }
+.response-workbench { display: flex; flex-direction: column; gap: 18px; min-height: 0; padding: 0 3px 8px 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
 .provocation-copy { border: 0; padding: 5px 24px 4px 0; }
 .provocation-copy p { margin: 0; font: 700 clamp(25px, 2.1vw, 32px)/1.03 var(--display-font); letter-spacing: -.015em; }
 .response-editor { min-height: 230px; resize: none; border: 0; border-bottom: 2px solid var(--ink); padding: 17px 4px; background: transparent; box-shadow: none; font: 500 17px/1.42 'DM Sans'; }
@@ -737,6 +737,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .spark-catcher { display: grid; grid-template-columns: 1fr; place-items: center; min-height: 70px; padding: 0; }
 .spark-catcher i { font-size: 19px; }
 .spark-retry { align-self: center; font-size: 14px; }
+.response-submit-dock { position: relative; z-index: 4; display: flex; flex: 0 0 auto; justify-content: flex-end; padding-top: 11px; background: linear-gradient(180deg, rgba(250,246,233,0), #faf6e9 28%); }
 .response-submit { align-self: flex-end; border: 0; border-bottom: 1px solid var(--ink); padding: 7px 0; color: var(--ink); background: transparent; font: 500 9px 'DM Mono'; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: opacity 160ms ease, translate 180ms ease; }
 .response-submit:hover:not(:disabled) { translate: 4px 0; }
 .response-submit:disabled { cursor: default; opacity: .22; }
@@ -1092,24 +1093,24 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .active-card-wrap .change-card:not(.swarm-card).is-selected { width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; }
   .active-card-wrap .card-face { border-radius: 9px; }
   .active-card-wrap .generation-surface {
-    display: flex;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
     height: 100%;
     padding: clamp(22px, 4.5dvh, 28px) 20px 18px;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
     overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-    -webkit-overflow-scrolling: touch;
   }
   .active-card-wrap .surface-close { top: 8px; right: 8px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; font-size: 24px; touch-action: manipulation; }
-  .active-card-wrap .response-workbench { flex: 0 0 auto; gap: 14px; width: 100%; height: auto; min-height: 100%; }
+  .active-card-wrap .response-workbench { gap: 14px; width: 100%; height: auto; min-height: 0; padding: 0 2px 8px 0; overflow-y: auto; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
   .active-card-wrap .provocation-copy { padding: 4px 30px 1px 0; }
   .active-card-wrap .provocation-copy p { font-size: clamp(21px, 6.3vw, 27px); line-height: 1.02; }
   .active-card-wrap .response-editor { min-height: clamp(136px, 24dvh, 210px); padding: 13px 4px; font-size: 16px; line-height: 1.38; touch-action: pan-y; }
   .active-card-wrap .spark-cloud { min-height: 86px; }
   .active-card-wrap .spark-single-stage { min-height: 72px; }
   .active-card-wrap .spark-single-stage button { min-height: 44px; padding: 9px 6px; font-size: clamp(16px, 4.7vw, 20px); touch-action: manipulation; }
-  .active-card-wrap .response-submit { position: sticky; z-index: 2; bottom: 0; align-self: stretch; min-height: 46px; border: 1px solid var(--ink); padding: 11px 14px; color: var(--paper-light); background: var(--ink); box-shadow: 3px 4px 0 var(--card-color), 0 -10px 20px #faf6e9; text-align: center; touch-action: manipulation; }
+  .active-card-wrap .response-submit-dock { padding: 10px 3px 3px; background: linear-gradient(180deg, rgba(250,246,233,0), #faf6e9 24%); }
+  .active-card-wrap .response-submit { position: static; align-self: stretch; width: 100%; min-height: 46px; border: 1px solid var(--ink); padding: 11px 14px; color: var(--paper-light); background: var(--ink); box-shadow: 3px 4px 0 var(--card-color); text-align: center; touch-action: manipulation; }
   .mode-switch button { min-width: 66px; }
   .workspace { padding: 0 16px 80px; }
   .journey-strip { top: 64px; display: grid; grid-template-columns: 128px minmax(500px, 1fr); gap: 12px; min-height: 104px; margin: 0 -16px; padding: 10px 16px; overflow-x: auto; }
