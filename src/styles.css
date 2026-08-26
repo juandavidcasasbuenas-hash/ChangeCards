@@ -350,6 +350,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .onboarding-hint i { font: italic 400 25px/1 var(--display-font); }
 .onboarding-hint span { display: flex; flex-direction: column; align-items: flex-start; }
 .onboarding-hint strong { font: italic 700 15px/1.05 var(--display-font); white-space: nowrap; }
+.tap-label { display: none; }
 .onboarding-hint small { margin-top: 3px; color: var(--muted); font: 500 7px/1 'DM Mono'; letter-spacing: .055em; text-transform: uppercase; white-space: nowrap; }
 .deck-onboarding-hint { left: calc(100% + 10px); top: 56px; }
 .deck-onboarding-hint i { animation: coachArrowLeft 2.4s 1.3s ease-in-out infinite; }
@@ -542,7 +543,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .card-grid { display: grid; grid-template-columns: repeat(6, minmax(145px, 1fr)); column-gap: clamp(24px, 2.6vw, 42px); row-gap: clamp(32px, 3.3vw, 50px); align-items: start; perspective: 1500px; }
 .change-card { position: relative; width: 100%; aspect-ratio: 5/7; transform: rotate(var(--tilt)); transform-origin: center; perspective: 1300px; animation: dealCard 500ms var(--deal-delay) cubic-bezier(.2,.8,.2,1) both; transition: width 420ms cubic-bezier(.22,1,.36,1), height 420ms cubic-bezier(.22,1,.36,1), transform 360ms cubic-bezier(.22,1,.36,1), filter 360ms ease, opacity 300ms ease; will-change: transform; }
-.change-card:hover:not(.is-selected) { z-index: 30; filter: saturate(1.06); transform: translateY(-6px) rotate(0) scale(1.065); }
 .change-card:active:not(.is-selected) { transform: translateY(-2px) rotate(0) scale(1.025); }
 .card-rotator { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 620ms cubic-bezier(.22,1,.36,1); }
 .change-card.is-flipped .card-rotator { transform: rotateY(180deg); }
@@ -571,6 +571,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .card-front strong { position: relative; z-index: 1; display: -webkit-box; max-width: 11ch; margin: 0; overflow: hidden; font: 600 clamp(15px, 1.25vw, 22px)/.97 'DM Sans'; letter-spacing: -.055em; text-transform: uppercase; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .card-question { position: relative; z-index: 1; display: -webkit-box; min-height: 0; overflow: hidden; font: 400 clamp(8px, .62vw, 10px)/1.25 'DM Sans'; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .card-back { transform: rotateY(180deg); background: var(--ink); }
+
+@media (hover: hover) and (pointer: fine) {
+  .change-card:hover:not(.is-selected) { z-index: 30; filter: saturate(1.06); transform: translateY(-6px) rotate(0) scale(1.065); }
+}
 
 .change-card.category-multidisciplinary { --card-color: var(--blue); }
 .change-card.category-ingenious { --card-color: var(--red); }
@@ -836,22 +840,113 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .mode-title { font-size: 37px; }
   .mode-desc { font-size: 14px; }
   .mode-detail { font-size: 11px; }
-  .topbar { height: 64px; padding: 0 16px; }
+  .topbar { height: 60px; padding: 0 15px; }
   .topbar .text-button { display: none; }
-  .tabletop { min-height: calc(100svh - 64px); overflow: auto; }
-  .tabletop-canvas { width: 920px; height: 900px; }
-  .side-deck { top: 22px; left: 18px; width: 105px; }
-  .deck-stack { width: 88px; height: 123px; }
-  .deck-back { padding: 11px 10px 9px; }
+  .tabletop {
+    min-height: calc(100svh - 60px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    background:
+      radial-gradient(circle at 76% 12%, rgba(255,255,255,.74), transparent 17rem),
+      linear-gradient(108deg, rgba(255,255,255,.16), transparent 46%),
+      #e8e1d2;
+  }
+  .tabletop-canvas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 30px 16px;
+    width: 100%;
+    height: auto;
+    min-height: calc(100svh - 60px);
+    padding: 228px 16px max(80px, env(safe-area-inset-bottom));
+  }
+  .side-deck { top: 18px; left: 16px; width: 92px; }
+  .deck-stack { width: 84px; height: 118px; margin: 0 0 10px; touch-action: manipulation; }
+  .deck-back { padding: 11px 10px 9px; box-shadow: 4px 6px 0 rgba(23,23,19,.15), 0 11px 20px rgba(42,35,25,.16); }
   .deck-back .logo { font-size: 12px; }
-  .side-deck > p { width: 95px; font-size: 7px; }
-  .deal-controls { width: 95px; }
-  .deal-controls button { padding: 9px 7px; font-size: 7px; }
+  .deck-back > span:last-child { font-size: 23px; }
+  .side-deck > p { display: none; }
+  .deal-controls { width: 84px; }
+  .deal-controls button { min-height: 42px; padding: 9px 6px 9px 25px; font-size: 7px; touch-action: manipulation; }
+  .deal-controls button::before { left: 8px; }
+  .side-deck.is-coaching-deck .deal-controls { margin-top: 36px; }
+  .tap-label { display: inline; }
+  .click-label { display: none; }
+  .deck-onboarding-hint { left: 0; top: 126px; gap: 4px; }
+  .deck-onboarding-hint i { display: none; }
+  .deck-onboarding-hint strong { font-size: 13px; }
+  .deck-onboarding-hint small { font-size: 6px; }
   .tabletop-progress { right: 22px; }
-  .tabletop-canvas > .original-note { width: 340px; }
-  .table-card-shell { width: 90px; }
-  .active-card-layer { padding: 14px; }
-  .active-card-wrap { width: min(390px, calc(100vw - 28px)); }
+  .tabletop-canvas > .original-note {
+    left: 124px;
+    right: 14px;
+    top: 22px;
+    width: auto;
+    min-height: 166px;
+    padding: 25px 18px 22px;
+    transform: rotate(-.8deg);
+  }
+  .tabletop-canvas > .original-note > span { font-size: 8px; }
+  .tabletop-canvas > .original-note p {
+    display: -webkit-box;
+    margin-top: 10px;
+    overflow: hidden;
+    font-size: clamp(13px, 3.8vw, 16px);
+    line-height: 1.28;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 7;
+  }
+  .tabletop-canvas > .original-note::after { right: 12px; bottom: 10px; font-size: 6px; }
+  .tabletop-canvas .table-card-shell {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    z-index: auto;
+    justify-self: center;
+    width: 100%;
+    max-width: 168px;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  .tabletop-canvas .table-card-shell.has-coachmark { margin-bottom: 54px; }
+  .tabletop-canvas .table-card-shell:active { cursor: pointer; }
+  .tabletop-canvas .table-card-shell .change-card:active { transform: translateY(-2px) rotate(var(--tilt)) scale(.985); }
+  .tabletop-canvas .table-card-shell .card-front { grid-template-rows: auto 44px auto minmax(0,1fr); gap: 6px; padding: 13px 13px 28px; touch-action: manipulation; }
+  .tabletop-canvas .table-card-shell .card-category { font-size: 7px; }
+  .tabletop-canvas .table-card-shell .card-symbol { min-height: 42px; }
+  .tabletop-canvas .table-card-shell .card-icon { width: 45px; height: 45px; }
+  .tabletop-canvas .table-card-shell .card-front strong { font-size: clamp(15px, 4.2vw, 18px); line-height: .96; }
+  .tabletop-canvas .table-card-shell .card-question { font-size: clamp(9px, 2.65vw, 11px); line-height: 1.2; -webkit-line-clamp: 4; }
+  .tabletop-canvas .table-card-shell .change-card.is-face-down .used-card-back { padding: 14px; gap: 8px; touch-action: manipulation; }
+  .tabletop-canvas .table-card-shell .change-card.is-face-down .used-card-back .card-icon { width: 36px; height: 36px; }
+  .tabletop-canvas .table-card-shell .change-card.is-face-down .used-card-back > span { font-size: 7px; }
+  .tabletop-canvas .table-card-shell .change-card.is-face-down .used-card-back strong { font-size: clamp(13px, 3.8vw, 16px); }
+  .tabletop-canvas .table-card-shell .saved-note { font-size: clamp(9px, 2.45vw, 11px); line-height: 1.25; -webkit-line-clamp: 7; }
+  .card-onboarding-hint { top: calc(100% + 10px); }
+  .card-onboarding-hint strong { font-size: 14px; }
+  .active-card-layer {
+    place-items: start center;
+    padding: max(10px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .active-card-scrim { position: fixed; }
+  .active-card-wrap { width: min(400px, 100%); margin: auto; }
+  .active-card-wrap .change-card:not(.swarm-card).is-selected { min-height: min(660px, calc(100svh - 22px)); aspect-ratio: 5 / 7; }
+  .active-card-wrap .card-face { border-radius: 9px; }
+  .active-card-wrap .generation-surface { padding: 28px 20px 18px; overflow-y: auto; }
+  .active-card-wrap .surface-close { top: 8px; right: 8px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; font-size: 24px; touch-action: manipulation; }
+  .active-card-wrap .response-workbench { gap: 14px; }
+  .active-card-wrap .provocation-copy { padding: 4px 30px 1px 0; }
+  .active-card-wrap .provocation-copy p { font-size: clamp(21px, 6.3vw, 27px); line-height: 1.02; }
+  .active-card-wrap .response-editor { min-height: clamp(160px, 27svh, 220px); padding: 13px 4px; font-size: 16px; line-height: 1.38; touch-action: pan-y; }
+  .active-card-wrap .spark-cloud { min-height: 86px; }
+  .active-card-wrap .spark-single-stage { min-height: 72px; }
+  .active-card-wrap .spark-single-stage button { min-height: 44px; padding: 9px 6px; font-size: clamp(16px, 4.7vw, 20px); touch-action: manipulation; }
+  .active-card-wrap .response-submit { align-self: stretch; min-height: 46px; border: 1px solid var(--ink); padding: 11px 14px; color: var(--paper-light); background: var(--ink); box-shadow: 3px 4px 0 var(--card-color); text-align: center; touch-action: manipulation; }
   .mode-switch button { min-width: 66px; }
   .workspace { padding: 0 16px 80px; }
   .journey-strip { top: 64px; display: grid; grid-template-columns: 128px minmax(500px, 1fr); gap: 12px; min-height: 104px; margin: 0 -16px; padding: 10px 16px; overflow-x: auto; }

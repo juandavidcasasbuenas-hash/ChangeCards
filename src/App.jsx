@@ -279,6 +279,20 @@ function Tabletop({ session, update }) {
   const remainingCards = CARDS.filter((card) => !dealtCardIds.includes(card.id))
   const activeCard = CARDS.find((card) => card.id === activeId)
 
+  useEffect(() => {
+    if (!activeCard) return undefined
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setActiveId(null)
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [activeCard])
+
   const noteContext = useMemo(() => CARDS.flatMap((card) => {
     const note = notes[card.id]
     if (!note?.note?.trim()) return []
@@ -317,14 +331,22 @@ function Tabletop({ session, update }) {
     let toLeft = 145
     let toTop = 92
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth || 1200 : 1200
-    const cardWidth = viewportWidth <= 720 ? 90 : Math.min(136, Math.max(88, viewportWidth * 0.087))
-    const cardHeight = cardWidth * 1.4
+    let cardWidth = viewportWidth <= 720 ? Math.min(168, (viewportWidth - 48) / 2) : Math.min(136, Math.max(88, viewportWidth * 0.087))
+    let cardHeight = cardWidth * 1.4
     try {
       const canvas = canvasRef.current?.getBoundingClientRect()
       const deck = deckRef.current?.querySelector('.deck-stack')?.getBoundingClientRect()
+      const target = canvasRef.current?.querySelector(`[data-card-id="${pending.id}"]`)?.getBoundingClientRect()
       if (canvas && deck) {
-        toLeft = canvas.left + (targetX / 100) * canvas.width
-        toTop = canvas.top + (targetY / 100) * canvas.height
+        if (target?.width && target?.height) {
+          toLeft = target.left
+          toTop = target.top
+          cardWidth = target.width
+          cardHeight = target.height
+        } else {
+          toLeft = canvas.left + (targetX / 100) * canvas.width
+          toTop = canvas.top + (targetY / 100) * canvas.height
+        }
         fromLeft = deck.left + (deck.width - cardWidth) / 2
         fromTop = deck.top + (deck.height - cardHeight) / 2
       }
@@ -425,7 +447,7 @@ function Tabletop({ session, update }) {
 
   return (
     <section className="tabletop" aria-label="Change Cards idea table">
-      <aside className={`side-deck ${dragOverDeck ? 'is-drop-target' : ''}`} ref={deckRef} aria-label="Card deck">
+      <aside className={`side-deck ${dragOverDeck ? 'is-drop-target' : ''} ${coachStep === 'deck' ? 'is-coaching-deck' : ''}`} ref={deckRef} aria-label="Card deck">
         <button
           type="button"
           className={`deck-stack ${remainingCards.length ? '' : 'is-empty'} ${dealFlight ? 'is-dealing-card' : ''}`}
@@ -445,7 +467,7 @@ function Tabletop({ session, update }) {
         {coachStep === 'deck' && remainingCards.length > 0 && (
           <div className="onboarding-hint deck-onboarding-hint" role="note">
             <i aria-hidden="true">←</i>
-            <span><strong>Click the deck</strong><small>to deal a card</small></span>
+            <span><strong><span className="tap-label">Tap</span><span className="click-label">Click</span> the deck</strong><small>to deal a card</small></span>
           </div>
         )}
         <p>{dragOverDeck ? 'Drop to put it back' : remainingCards.length ? `${remainingCards.length} still in the deck` : 'The whole deck is out'}</p>
@@ -535,6 +557,9 @@ function DraggableTableCard({ card, index, canvasRef, deckRef, position, isDeali
 
   function pointerDown(event) {
     if (event.button !== 0) return
+    // Touch is for tapping and scrolling. Freeform table dragging remains a
+    // desktop interaction so a small finger wobble can never swallow a tap.
+    if (event.pointerType !== 'mouse' || window.matchMedia?.('(max-width: 720px)').matches) return
     const canvas = canvasRef.current?.getBoundingClientRect()
     const cardRect = event.currentTarget.getBoundingClientRect()
     if (!canvas) return
@@ -604,7 +629,7 @@ function DraggableTableCard({ card, index, canvasRef, deckRef, position, isDeali
 
   return (
     <div
-      className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''}`}
+      className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''} ${showCoachmark ? 'has-coachmark' : ''}`}
       data-card-id={card.id}
       style={{
         left: `${localPosition.x}%`,
@@ -621,7 +646,7 @@ function DraggableTableCard({ card, index, canvasRef, deckRef, position, isDeali
       {showCoachmark && !visited && (
         <div className="onboarding-hint card-onboarding-hint" role="note">
           <i aria-hidden="true">↑</i>
-          <span><strong>Click the card</strong><small>to start ideating</small></span>
+          <span><strong><span className="tap-label">Tap</span><span className="click-label">Click</span> the card</strong><small>to start ideating</small></span>
         </div>
       )}
     </div>
@@ -861,6 +886,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
   const sparks = sparkState?.sparks || []
 
   useEffect(() => {
+    if (window.matchMedia?.('(max-width: 720px)').matches) return undefined
     const focusTimer = window.setTimeout(() => editorRef.current?.focus({ preventScroll: true }), 720)
     return () => window.clearTimeout(focusTimer)
   }, [])
