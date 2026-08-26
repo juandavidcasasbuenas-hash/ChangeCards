@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+const COMPACT_TABLE_QUERY = '(max-width: 820px)'
+
 const CARDS = [
   { id: 1, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Borrow a Brain', provocation: 'How would someone from a completely different field solve this?' },
   { id: 2, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'The Wrong Expert', provocation: 'Who has absolutely no business solving this — and what might they notice?' },
@@ -265,6 +267,7 @@ function Tabletop({ session, update }) {
   const [activeId, setActiveId] = useState(null)
   const [sparkStates, setSparkStates] = useState({})
   const [dragOverDeck, setDragOverDeck] = useState(false)
+  const [mobileRearranging, setMobileRearranging] = useState(false)
   const [dealFlight, setDealFlight] = useState(null)
   const [coachStep, setCoachStep] = useState(() => {
     try {
@@ -282,14 +285,30 @@ function Tabletop({ session, update }) {
   useEffect(() => {
     if (!activeCard) return undefined
     const previousOverflow = document.body.style.overflow
+    const viewport = window.visualViewport
+    const syncViewport = () => {
+      const height = viewport?.height || window.innerHeight
+      const offset = viewport?.offsetTop || 0
+      document.documentElement.style.setProperty('--workshop-viewport-height', `${height}px`)
+      document.documentElement.style.setProperty('--workshop-viewport-offset', `${offset}px`)
+    }
     const closeOnEscape = (event) => {
       if (event.key === 'Escape') setActiveId(null)
     }
+    syncViewport()
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', closeOnEscape)
+    window.addEventListener('resize', syncViewport)
+    viewport?.addEventListener('resize', syncViewport)
+    viewport?.addEventListener('scroll', syncViewport)
     return () => {
       document.body.style.overflow = previousOverflow
+      document.documentElement.style.removeProperty('--workshop-viewport-height')
+      document.documentElement.style.removeProperty('--workshop-viewport-offset')
       window.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('resize', syncViewport)
+      viewport?.removeEventListener('resize', syncViewport)
+      viewport?.removeEventListener('scroll', syncViewport)
     }
   }, [activeCard])
 
@@ -367,7 +386,16 @@ function Tabletop({ session, update }) {
       duration,
     }
     setDealFlight(flight)
-    window.setTimeout(() => setDealFlight((current) => current?.id === pending.id ? null : current), duration)
+    window.setTimeout(() => {
+      setDealFlight((current) => current?.id === pending.id ? null : current)
+      if (window.matchMedia?.(COMPACT_TABLE_QUERY).matches) {
+        canvasRef.current?.querySelector(`[data-card-id="${pending.id}"]`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest',
+        })
+      }
+    }, duration)
   }, [dealtCardIds])
 
   function dealAll() {
@@ -393,6 +421,17 @@ function Tabletop({ session, update }) {
 
   function moveCard(cardId, position) {
     update({ cardPositions: { ...cardPositions, [cardId]: position } })
+  }
+
+  function reorderCard(cardId, targetId) {
+    if (!targetId || targetId === cardId) return
+    const nextIds = [...dealtCardIds]
+    const fromIndex = nextIds.indexOf(cardId)
+    const toIndex = nextIds.indexOf(targetId)
+    if (fromIndex < 0 || toIndex < 0) return
+    nextIds.splice(fromIndex, 1)
+    nextIds.splice(toIndex, 0, cardId)
+    update({ dealtCardIds: nextIds })
   }
 
   async function ensureSparks(card, force = false) {
@@ -446,7 +485,7 @@ function Tabletop({ session, update }) {
   }
 
   return (
-    <section className="tabletop" aria-label="Change Cards idea table">
+    <section className={`tabletop ${mobileRearranging ? 'is-rearranging' : ''}`} aria-label="Change Cards idea table">
       <aside className={`side-deck ${dragOverDeck ? 'is-drop-target' : ''} ${coachStep === 'deck' ? 'is-coaching-deck' : ''}`} ref={deckRef} aria-label="Card deck">
         <button
           type="button"
@@ -487,15 +526,20 @@ function Tabletop({ session, update }) {
               key={card.id}
               card={card}
               index={index}
+              previousCardId={dealtCardIds[index - 1]}
+              nextCardId={dealtCardIds[index + 1]}
               canvasRef={canvasRef}
               position={cardPositions[card.id] || defaultPosition(index)}
               isDealing={dealFlight?.id === card.id}
               visited={Boolean(notes[card.id]?.visited)}
               savedNote={notes[card.id]?.note || ''}
               onMove={(position) => moveCard(card.id, position)}
+              onReorder={(targetId) => reorderCard(card.id, targetId)}
               deckRef={deckRef}
               onReturn={() => returnCard(card.id)}
               onDeckTarget={setDragOverDeck}
+              onMobileDragStart={() => setMobileRearranging(true)}
+              onMobileDragEnd={() => setMobileRearranging(false)}
               onOpen={() => openCard(card)}
               onWarm={() => ensureSparks(card)}
               showCoachmark={coachStep === 'card' && index === 0}
@@ -546,20 +590,31 @@ function Tabletop({ session, update }) {
   )
 }
 
-function DraggableTableCard({ card, index, canvasRef, deckRef, position, isDealing, visited, savedNote, onMove, onReturn, onDeckTarget, onOpen, onWarm, showCoachmark }) {
+function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef, deckRef, position, isDealing, visited, savedNote, onMove, onReorder, onReturn, onDeckTarget, onMobileDragStart, onMobileDragEnd, onOpen, onWarm, showCoachmark }) {
   const [localPosition, setLocalPosition] = useState(position)
+  const [mobileDragOffset, setMobileDragOffset] = useState({ x: 0, y: 0 })
+  const [mobileDragging, setMobileDragging] = useState(false)
   const drag = useRef(null)
+  const mobileDrag = useRef(null)
+  const mobileAutoScroll = useRef(null)
+  const mobileAutoScrollSpeed = useRef(0)
+  const mobileDropTarget = useRef(null)
   const dragged = useRef(false)
   const pointerActivated = useRef(false)
   const overDeck = useRef(false)
 
   useEffect(() => setLocalPosition(position), [position.x, position.y])
 
+  useEffect(() => () => {
+    if (mobileAutoScroll.current) window.cancelAnimationFrame(mobileAutoScroll.current)
+    mobileDropTarget.current?.classList.remove('is-mobile-drop-target')
+  }, [])
+
   function pointerDown(event) {
     if (event.button !== 0) return
     // Touch is for tapping and scrolling. Freeform table dragging remains a
     // desktop interaction so a small finger wobble can never swallow a tap.
-    if (event.pointerType !== 'mouse' || window.matchMedia?.('(max-width: 720px)').matches) return
+    if (event.pointerType !== 'mouse' || window.matchMedia?.(COMPACT_TABLE_QUERY).matches) return
     const canvas = canvasRef.current?.getBoundingClientRect()
     const cardRect = event.currentTarget.getBoundingClientRect()
     if (!canvas) return
@@ -627,14 +682,171 @@ function DraggableTableCard({ card, index, canvasRef, deckRef, position, isDeali
     onOpen()
   }
 
+  function syncMobileDragOffset() {
+    const current = mobileDrag.current
+    if (!current) return
+    const scrollDelta = current.scrollContainer.scrollTop - current.startScrollTop
+    setMobileDragOffset({
+      x: current.clientX - current.startX,
+      y: current.clientY - current.startY + scrollDelta,
+    })
+  }
+
+  function runMobileAutoScroll() {
+    if (mobileAutoScroll.current || !mobileDrag.current || !mobileAutoScrollSpeed.current) return
+    const tick = () => {
+      const current = mobileDrag.current
+      const speed = mobileAutoScrollSpeed.current
+      if (!current || !speed) {
+        mobileAutoScroll.current = null
+        return
+      }
+      current.scrollContainer.scrollBy(0, speed)
+      syncMobileDragOffset()
+      mobileAutoScroll.current = window.requestAnimationFrame(tick)
+    }
+    mobileAutoScroll.current = window.requestAnimationFrame(tick)
+  }
+
+  function stopMobileAutoScroll() {
+    mobileAutoScrollSpeed.current = 0
+    if (mobileAutoScroll.current) window.cancelAnimationFrame(mobileAutoScroll.current)
+    mobileAutoScroll.current = null
+  }
+
+  function mobilePointerDown(event) {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    const scrollContainer = canvasRef.current?.closest('.tabletop')
+    if (!scrollContainer) return
+    mobileDrag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      startScrollTop: scrollContainer.scrollTop,
+      scrollContainer,
+      activated: false,
+    }
+    setMobileDragOffset({ x: 0, y: 0 })
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function mobileHandleKeyDown(event) {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      event.stopPropagation()
+      onReturn()
+      return
+    }
+    const targetId = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? previousCardId
+      : (event.key === 'ArrowRight' || event.key === 'ArrowDown') ? nextCardId
+        : null
+    if (!targetId) return
+    event.preventDefault()
+    event.stopPropagation()
+    onReorder(targetId)
+  }
+
+  function mobilePointerMove(event) {
+    const current = mobileDrag.current
+    if (!current || current.pointerId !== event.pointerId) return
+    event.preventDefault()
+    event.stopPropagation()
+    current.clientX = event.clientX
+    current.clientY = event.clientY
+    if (!current.activated) {
+      if (Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < 7) return
+      current.activated = true
+      setMobileDragging(true)
+      onMobileDragStart()
+    }
+    syncMobileDragOffset()
+
+    const deck = deckRef.current?.getBoundingClientRect()
+    const insideDeck = Boolean(deck && event.clientX >= deck.left - 14 && event.clientX <= deck.right + 14 && event.clientY >= deck.top - 14 && event.clientY <= deck.bottom + 14)
+    if (insideDeck !== overDeck.current) {
+      overDeck.current = insideDeck
+      onDeckTarget(insideDeck)
+    }
+
+    const nextDropTarget = insideDeck ? null : document.elementsFromPoint(event.clientX, event.clientY)
+      .map((element) => element.closest?.('.table-card-shell'))
+      .find((element) => element && element.dataset.cardId !== String(card.id) && !element.classList.contains('deal-flight-card'))
+    if (nextDropTarget !== mobileDropTarget.current) {
+      mobileDropTarget.current?.classList.remove('is-mobile-drop-target')
+      nextDropTarget?.classList.add('is-mobile-drop-target')
+      mobileDropTarget.current = nextDropTarget || null
+    }
+
+    const edgeSize = Math.min(130, window.innerHeight * 0.18)
+    if (event.clientY < 60 + edgeSize) {
+      mobileAutoScrollSpeed.current = -Math.max(4, (60 + edgeSize - event.clientY) * 0.12)
+    } else if (event.clientY > window.innerHeight - edgeSize) {
+      mobileAutoScrollSpeed.current = Math.max(4, (event.clientY - (window.innerHeight - edgeSize)) * 0.12)
+    } else {
+      stopMobileAutoScroll()
+    }
+    runMobileAutoScroll()
+  }
+
+  function finishMobileDrag(event, cancelled = false) {
+    const current = mobileDrag.current
+    if (!current || (event && current.pointerId !== event.pointerId)) return
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    stopMobileAutoScroll()
+    mobileDropTarget.current?.classList.remove('is-mobile-drop-target')
+    mobileDropTarget.current = null
+
+    const clientX = event?.clientX ?? current.clientX
+    const clientY = event?.clientY ?? current.clientY
+    const deck = deckRef.current?.getBoundingClientRect()
+    const releasedOnDeck = Boolean(deck && clientX >= deck.left - 14 && clientX <= deck.right + 14 && clientY >= deck.top - 14 && clientY <= deck.bottom + 14)
+    if (!cancelled && current.activated && (overDeck.current || releasedOnDeck)) {
+      onReturn()
+    } else if (!cancelled && current.activated) {
+      let target = document.elementsFromPoint(clientX, clientY)
+        .map((element) => element.closest?.('.table-card-shell'))
+        .find((element) => element && element.dataset.cardId !== String(card.id) && !element.classList.contains('deal-flight-card'))
+      if (!target) {
+        target = [...(canvasRef.current?.querySelectorAll('.table-card-shell') || [])]
+          .filter((element) => element.dataset.cardId !== String(card.id) && !element.classList.contains('deal-flight-card'))
+          .map((element) => {
+            const rect = element.getBoundingClientRect()
+            return {
+              element,
+              distance: Math.hypot(clientX - (rect.left + rect.width / 2), clientY - (rect.top + rect.height / 2)),
+            }
+          })
+          .filter(({ distance }) => distance < 180)
+          .sort((a, b) => a.distance - b.distance)[0]?.element
+      }
+      if (target) onReorder(Number(target.dataset.cardId))
+    }
+
+    mobileDrag.current = null
+    overDeck.current = false
+    setMobileDragging(false)
+    setMobileDragOffset({ x: 0, y: 0 })
+    onDeckTarget(false)
+    if (current.activated) onMobileDragEnd()
+  }
+
   return (
     <div
-      className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''} ${showCoachmark ? 'has-coachmark' : ''}`}
+      className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''} ${showCoachmark ? 'has-coachmark' : ''} ${mobileDragging ? 'is-mobile-dragging' : ''}`}
       data-card-id={card.id}
       style={{
         left: `${localPosition.x}%`,
         top: `${localPosition.y}%`,
         '--table-z': index + 2,
+        '--mobile-drag-x': `${mobileDragOffset.x}px`,
+        '--mobile-drag-y': `${mobileDragOffset.y}px`,
       }}
       onPointerDown={pointerDown}
       onPointerMove={pointerMove}
@@ -643,10 +855,23 @@ function DraggableTableCard({ card, index, canvasRef, deckRef, position, isDeali
       onPointerEnter={onWarm}
     >
       <ChangeCard card={card} index={index} onSelect={select} faceDown={visited} used={visited} savedNote={savedNote} />
+      <button
+        className="mobile-card-drag-handle"
+        type="button"
+        aria-label={`Drag ${card.title} to rearrange it or return it to the deck. Arrow keys move it; Delete returns it.`}
+        onKeyDown={mobileHandleKeyDown}
+        onPointerDown={mobilePointerDown}
+        onPointerMove={mobilePointerMove}
+        onPointerUp={(event) => finishMobileDrag(event)}
+        onPointerCancel={(event) => finishMobileDrag(event, true)}
+      >
+        <span className="mobile-drag-dots" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
+        <span aria-hidden="true">Drag</span>
+      </button>
       {showCoachmark && !visited && (
         <div className="onboarding-hint card-onboarding-hint" role="note">
           <i aria-hidden="true">↑</i>
-          <span><strong><span className="tap-label">Tap</span><span className="click-label">Click</span> the card</strong><small>to start ideating</small></span>
+          <span><strong><span className="tap-label">Tap</span><span className="click-label">Click</span> the card</strong><small>to ideate · use the grip to move</small></span>
         </div>
       )}
     </div>
@@ -886,7 +1111,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
   const sparks = sparkState?.sparks || []
 
   useEffect(() => {
-    if (window.matchMedia?.('(max-width: 720px)').matches) return undefined
+    if (window.matchMedia?.(COMPACT_TABLE_QUERY).matches) return undefined
     const focusTimer = window.setTimeout(() => editorRef.current?.focus({ preventScroll: true }), 720)
     return () => window.clearTimeout(focusTimer)
   }, [])
