@@ -12,6 +12,7 @@
     "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "charter-webfont": "^4.1.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",

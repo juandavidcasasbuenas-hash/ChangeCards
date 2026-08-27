@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 
 const COMPACT_TABLE_QUERY = '(max-width: 820px)'
 
@@ -166,7 +167,12 @@ function App() {
   }
 
   if (session.stage === 'intro' || !session.idea) {
-    return <Entry session={session} update={update} />
+    return (
+      <>
+        <Entry session={session} update={update} />
+        <Analytics />
+      </>
+    )
   }
 
   const savedCards = CARDS
@@ -174,10 +180,13 @@ function App() {
     .sort((a, b) => (session.swarm[b.id]?.updatedAt || 0) - (session.swarm[a.id]?.updatedAt || 0))
 
   return (
-    <main className="app-shell mode-tabletop">
-      <TopBar onRestart={startAgain} savedCards={savedCards} onOpenSaved={setActiveCardId} />
-      <Tabletop session={session} update={update} activeId={activeCardId} setActiveId={setActiveCardId} />
-    </main>
+    <>
+      <main className="app-shell mode-tabletop">
+        <TopBar onRestart={startAgain} savedCards={savedCards} onOpenSaved={setActiveCardId} />
+        <Tabletop session={session} update={update} activeId={activeCardId} setActiveId={setActiveCardId} />
+      </main>
+      <Analytics />
+    </>
   )
 }
 
