@@ -1,230 +1,153 @@
 import puppeteer from 'puppeteer-core'
 
+const origin = 'http://localhost:8787'
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true,
   args: ['--no-sandbox'],
 })
 
-const page = await browser.newPage()
-await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 })
+try {
+  const page = await browser.newPage()
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 })
+  const consoleErrors = []
+  let sparkRequestCount = 0
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text())
+  })
+  page.on('pageerror', (error) => consoleErrors.push(error.message))
+  await page.setRequestInterception(true)
+  page.on('request', (request) => {
+    if (!request.url().includes('/api/sparks')) {
+      request.continue()
+      return
+    }
+    sparkRequestCount += 1
+    request.respond({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ sparks: [
+        'A doorstep story exchange', 'Borrowed chairs outside', 'One street at a time', 'Resident hosts', 'A shared book trolley',
+        'Tea before books', 'Handwritten invitations', 'The quietest neighbour', 'A weekly doorstep bell', 'Stories in returned books',
+      ] }),
+    })
+  })
 
-const consoleErrors = []
-let transformRequestCount = 0
-let sparkRequestCount = 0
-page.on('console', (message) => {
-  if (message.type() === 'error') consoleErrors.push(message.text())
-})
-page.on('pageerror', (error) => consoleErrors.push(error.message))
-page.on('request', (request) => {
-  if (request.url().includes('/api/transform')) transformRequestCount += 1
-  if (request.url().includes('/api/sparks')) sparkRequestCount += 1
-})
+  await page.goto(origin, { waitUntil: 'networkidle0' })
+  await page.evaluate(() => {
+    localStorage.removeItem('change-cards-session-v1')
+    localStorage.removeItem('change-cards-onboarding-v2')
+    sessionStorage.removeItem('change-cards-cache-v1')
+  })
+  await page.reload({ waitUntil: 'networkidle0' })
 
-await page.goto('http://localhost:8787', { waitUntil: 'networkidle0' })
-await page.evaluate(() => {
-  localStorage.removeItem('change-cards-session-v1')
-  sessionStorage.removeItem('change-cards-cache-v1')
-})
-await page.reload({ waitUntil: 'networkidle0' })
-
-const initialText = await page.$eval('body', (element) => element.innerText)
-if (!initialText.includes('Push an idea') || !initialText.includes('What are you working on?')) {
-  throw new Error('Entry screen did not render expected content')
-}
-await page.screenshot({ path: 'verification-entry.png', fullPage: true })
-
-await page.type('#idea', 'A neighbourhood library that helps isolated older residents make new friends.')
-await page.click('.idea-form .ink-button')
-await page.waitForSelector('.mode-choice')
-await new Promise((resolve) => setTimeout(resolve, 800))
-await page.screenshot({ path: 'verification-modes.png', fullPage: true })
-
-await page.click('.evolve-choice')
-await page.waitForSelector('.card-grid .change-card')
-await new Promise((resolve) => setTimeout(resolve, 900))
-const cardCount = await page.$$eval('.card-grid .change-card', (cards) => cards.length)
-if (cardCount !== 16) throw new Error(`Expected 16 cards, found ${cardCount}`)
-const iconCount = await page.$$eval('.card-grid .card-icon', (icons) => new Set(icons.map((icon) => icon.dataset.icon)).size)
-if (iconCount !== 16) throw new Error(`Expected 16 unique card icons, found ${iconCount}`)
-const deckOverlap = await page.$$eval('.card-grid .change-card', (cards) => {
-  const rects = cards.map((card) => card.getBoundingClientRect())
-  return rects.some((a, index) => rects.slice(index + 1).some((b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2))
-})
-if (deckOverlap) throw new Error('Evolve deck cards overlap before interaction')
-await page.screenshot({ path: 'verification-evolve.png', fullPage: true })
-
-const evolveHoverTarget = await page.$('.card-grid .change-card:nth-child(5)')
-const evolveBefore = await evolveHoverTarget.boundingBox()
-await evolveHoverTarget.hover()
-await new Promise((resolve) => setTimeout(resolve, 300))
-const evolveAfter = await evolveHoverTarget.boundingBox()
-if (evolveAfter.width * evolveAfter.height < evolveBefore.width * evolveBefore.height * 1.015 || Math.abs((evolveAfter.x + evolveAfter.width / 2) - (evolveBefore.x + evolveBefore.width / 2)) > 3) {
-  throw new Error(`Evolve hover is not enlarging predictably in place: ${JSON.stringify({ evolveBefore, evolveAfter })}`)
-}
-await page.screenshot({ path: 'verification-hover.png', fullPage: false })
-await page.click('.card-grid .change-card:nth-child(5) .card-front')
-await page.waitForSelector('.response-editor')
-await page.waitForFunction(
-  () => document.querySelector('.spark-single-stage') || document.querySelector('.spark-retry'),
-  { timeout: 120000 },
-)
-const sparkError = await page.$eval('.spark-retry', (element) => element.textContent).catch(() => null)
-if (sparkError) throw new Error(`Subject-specific sparks failed to load: ${sparkError}`)
-const sparkDeck = await page.$eval('.spark-single-stage', (stage) => ({
-  count: Number(stage.dataset.sparkCount),
-  current: stage.querySelector('button').dataset.spark,
-}))
-if (sparkDeck.count !== 12 || !sparkDeck.current || sparkDeck.current.split(/\s+/).length > 6) {
-  throw new Error(`Expected twelve concise prompts: ${JSON.stringify(sparkDeck)}`)
-}
-await page.waitForFunction((firstSpark) => document.querySelector('.spark-single-stage button')?.dataset.spark !== firstSpark, { timeout: 6000 }, sparkDeck.current)
-const rotatingSpark = await page.$eval('.spark-single-stage button', (button) => button.dataset.spark)
-const generationChrome = await page.$eval('.generation-surface', (element) => ({
-  backBorder: getComputedStyle(element.closest('.card-back')).borderTopWidth,
-  backBackground: getComputedStyle(element.closest('.card-back')).backgroundColor,
-  cardRect: element.closest('.change-card').getBoundingClientRect().toJSON(),
-  viewportHeight: window.innerHeight,
-}))
-if (generationChrome.backBorder === '0px' || generationChrome.backBackground === 'rgba(0, 0, 0, 0)' || Math.abs(generationChrome.cardRect.width / generationChrome.cardRect.height - 5 / 7) > 0.03) {
-  throw new Error('The writing workspace is not contained on a physical card back')
-}
-if (generationChrome.cardRect.top < 200 || generationChrome.cardRect.bottom > generationChrome.viewportHeight + 5) {
-  throw new Error(`Selected card did not move smoothly into the visible workspace: ${JSON.stringify(generationChrome.cardRect)}`)
-}
-await page.$eval('.spark-single-stage button', (element) => element.click())
-await page.waitForFunction((spark) => document.querySelector('.response-editor')?.value === `${spark} — `, {}, rotatingSpark)
-const authoredResponse = 'The library becomes a weekly doorstep service: librarians bring books and a small shared activity to each street, so neighbours meet close to home.'
-await page.type('.response-editor', authoredResponse)
-const preservedDraft = await page.$eval('.response-editor', (element) => element.value)
-if (preservedDraft !== `${rotatingSpark} — ${authoredResponse}`) throw new Error('Taking a tiny spark did not leave the response editable')
-const finalAuthoredResponse = preservedDraft
-await new Promise((resolve) => setTimeout(resolve, 700))
-await page.screenshot({ path: 'verification-generation.png', fullPage: true })
-await page.click('.response-submit')
-await page.waitForFunction(() => document.querySelector('.deck-heading .eyebrow')?.textContent.includes('Change 2 of 3'))
-const authoredJourneyStep = await page.evaluate(() => JSON.parse(localStorage.getItem('change-cards-session-v1')).journey.at(-1))
-if (authoredJourneyStep.idea !== finalAuthoredResponse || !authoredJourneyStep.authored) throw new Error('The journey did not preserve the user-authored evolution verbatim')
-const playedPathCards = await page.$$eval('.journey-stop.complete .journey-card-slot', (cards) => cards.length)
-if (playedPathCards !== 1) throw new Error(`Expected one played card in the visible path, found ${playedPathCards}`)
-await new Promise((resolve) => setTimeout(resolve, 600))
-await page.screenshot({ path: 'verification-path.png', fullPage: true })
-
-await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
-await page.click('.card-grid .change-card:first-child .card-front')
-await page.waitForSelector('.response-editor')
-await new Promise((resolve) => setTimeout(resolve, 1000))
-const mobileAuthorCard = await page.$eval('.change-card.is-selected', (element) => {
-  const card = element.getBoundingClientRect()
-  const surface = element.querySelector('.generation-surface')
-  return {
-    ratio: card.width / card.height,
-    initialContentFits: surface.scrollHeight <= surface.clientHeight + 2,
-  }
-})
-if (Math.abs(mobileAuthorCard.ratio - 5 / 7) > 0.04 || !mobileAuthorCard.initialContentFits) {
-  throw new Error(`Mobile authoring card is not usable: ${JSON.stringify(mobileAuthorCard)}`)
-}
-await page.screenshot({ path: 'verification-mobile-evolve.png', fullPage: false })
-await page.click('.surface-close')
-await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 })
-if (transformRequestCount !== 0) throw new Error(`Evolve made ${transformRequestCount} unexpected model calls`)
-if (sparkRequestCount < 1) throw new Error('Evolve did not request subject-specific sparks')
-
-await page.click('.mode-switch button:nth-child(2)')
-await page.waitForSelector('.swarm-canvas')
-await new Promise((resolve) => setTimeout(resolve, 700))
-const swarmCardCount = await page.$$eval('.swarm-card-position', (cards) => cards.length)
-if (swarmCardCount !== 16) throw new Error(`Expected 16 Swarm cards, found ${swarmCardCount}`)
-const tabletop = await page.$eval('.swarm-canvas', (element) => {
-  const rect = element.getBoundingClientRect()
-  return { width: rect.width, viewport: window.innerWidth, border: getComputedStyle(element).borderTopWidth }
-})
-if (Math.abs(tabletop.width - tabletop.viewport) > 2 || tabletop.border !== '0px') {
-  throw new Error('Swarm tabletop is not using the full browser width')
-}
-await page.screenshot({ path: 'verification-swarm.png', fullPage: true })
-
-const hoverTarget = await page.$('.swarm-card-position:nth-child(3) .change-card')
-const hoverBefore = await hoverTarget.boundingBox()
-await hoverTarget.hover()
-await new Promise((resolve) => setTimeout(resolve, 300))
-const hoverAfter = await hoverTarget.boundingBox()
-if (hoverAfter.width * hoverAfter.height < hoverBefore.width * hoverBefore.height * 1.08 || Math.abs((hoverAfter.x + hoverAfter.width / 2) - (hoverBefore.x + hoverBefore.width / 2)) > 3) {
-  throw new Error(`Swarm hover is not enlarging predictably in place: ${JSON.stringify({ hoverBefore, hoverAfter })}`)
-}
-await page.screenshot({ path: 'verification-hover.png', fullPage: false })
-await page.click('.swarm-card-position:nth-child(3) .card-front')
-await page.waitForFunction(
-  () => document.querySelectorAll('.idea-sticky').length === 3 || document.querySelector('.swarm-error'),
-  { timeout: 120000 },
-)
-const swarmError = await page.$eval('.swarm-error', (element) => element.textContent).catch(() => null)
-const stickyCount = await page.$$eval('.idea-sticky', (stickies) => stickies.length)
-if (!swarmError && stickyCount !== 3) throw new Error(`Expected 3 Swarm ideas, found ${stickyCount}`)
-if (stickyCount) {
-  await page.click('.idea-sticky .sticky-actions button:first-child')
-  const starred = await page.$eval('.idea-sticky', (element) => element.classList.contains('is-starred'))
-  if (!starred) throw new Error('Swarm favourite interaction did not update')
-}
-await new Promise((resolve) => setTimeout(resolve, 500))
-await page.screenshot({ path: 'verification-swarm-played.png', fullPage: true })
-
-await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
-await new Promise((resolve) => setTimeout(resolve, 300))
-const mobileCanvas = await page.$eval('.swarm-canvas', (element) => ({
-  scrollWidth: element.scrollWidth,
-  clientWidth: element.clientWidth,
-}))
-await page.screenshot({ path: 'verification-mobile.png', fullPage: false })
-
-await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 })
-await page.evaluate(() => {
-  localStorage.setItem('change-cards-session-v1', JSON.stringify({
-    stage: 'play',
-    idea: 'A neighbourhood library that helps isolated older residents make new friends.',
-    mode: 'evolve',
-    targetSteps: 3,
-    evolveFinished: true,
-    swarm: {},
-    journey: [
-      { cardId: 5, cardTitle: 'Do the Opposite', provocation: 'What if you deliberately did the exact opposite?', category: 'ingenious', title: 'The Library That Keeps People Apart', idea: 'Visitors exchange anonymous book notes before they ever meet face-to-face.', shift: 'Connection begins through deliberate separation.' },
-      { cardId: 3, cardTitle: 'Build the Dream Team', provocation: 'If you could put any three kinds of people in the room, who would they be?', category: 'multidisciplinary', title: 'The Neighbourhood Story Exchange', idea: 'Older residents, theatre makers and librarians turn anonymous notes into live neighbourhood stories.', shift: 'A mixed team makes hidden connections visible.' },
-      { cardId: 14, cardTitle: 'Prototype It Tomorrow', provocation: 'What could you make tomorrow that would teach you something?', category: 'flexible', title: 'Three Notes by Friday', idea: 'The library leaves three handwritten prompts in returned books and tracks which ones bring readers back to meet.', shift: 'The programme becomes a tiny, observable experiment.' },
-    ],
+  const landing = await page.$eval('body', (element) => ({
+    text: element.innerText,
+    favicon: document.querySelector('link[rel="icon"]')?.getAttribute('href'),
+    creatorLink: document.querySelector('.project-credit a')?.getAttribute('href'),
   }))
-})
-await page.reload({ waitUntil: 'networkidle0' })
-await page.waitForSelector('.ending-page')
-const ancestryCount = await page.$$eval('.ancestry-step', (steps) => steps.length)
-if (ancestryCount !== 3) throw new Error(`Expected 3 ancestry steps, found ${ancestryCount}`)
-const finalPrimaryActions = await page.$$eval('.final-actions button', (buttons) => buttons.length)
-if (finalPrimaryActions !== 2) throw new Error(`Expected two primary ending actions, found ${finalPrimaryActions}`)
-const tinyCardOverflow = await page.$$eval('.tiny-change-card', (cards) => cards.some((card) => card.scrollWidth > card.clientWidth + 1 || card.scrollHeight > card.clientHeight + 1))
-if (tinyCardOverflow) throw new Error('Final journey card text is overflowing')
-await page.screenshot({ path: 'verification-ending.png', fullPage: true })
+  if (!landing.text.includes('Push an idea') || !landing.text.includes('What are you working on?')) throw new Error('Landing page content is missing')
+  if (!landing.favicon || landing.creatorLink !== 'https://jdcasasbuenas.com') throw new Error('Landing page identity metadata is missing')
 
-const overlay = await page.$('[data-nextjs-dialog], .vite-error-overlay, #webpack-dev-server-client-overlay')
-const result = {
-  title: await page.title(),
-  hasContent: initialText.trim().length > 0,
-  cardCount,
-  iconCount,
-  deckOverlap,
-  swarmCardCount,
-  fullWidthTabletop: true,
-  stableInPlaceHover: true,
-  userAuthoredFirst: true,
-  microSparks: true,
-  evolveUsesSparkModel: true,
-  mobileAuthorCard: true,
-  stickyCount,
-  swarmError,
-  mobileDeckScrolls: mobileCanvas.scrollWidth > mobileCanvas.clientWidth,
-  ancestryCount,
-  errorOverlay: Boolean(overlay),
-  consoleErrors,
+  const originalIdea = 'A neighbourhood library that helps isolated older residents make new friends.'
+  await page.type('#idea', originalIdea)
+  await page.click('.idea-form .ink-button')
+  await page.waitForSelector('.tabletop')
+  const initialTable = await page.$eval('.tabletop', (element) => ({
+    originalIdea: element.querySelector('.original-note p')?.textContent,
+    deckCount: element.querySelector('.deck-back > span:last-child')?.textContent,
+  }))
+  if (initialTable.originalIdea !== originalIdea || initialTable.deckCount !== '16') throw new Error(`Table did not initialise correctly: ${JSON.stringify(initialTable)}`)
+
+  await page.click('.deck-stack')
+  await page.waitForSelector('.deal-flight-card')
+  await page.waitForSelector('.deal-flight-card', { hidden: true, timeout: 4000 })
+  const dealtCards = await page.$$('.tabletop-canvas > .table-card-shell')
+  if (dealtCards.length !== 1) throw new Error(`Expected one dealt card, found ${dealtCards.length}`)
+  const dealtCardId = await page.$eval('.tabletop-canvas > .table-card-shell', (element) => element.dataset.cardId)
+
+  await page.click(`.tabletop-canvas > .table-card-shell[data-card-id="${dealtCardId}"] .card-front`)
+  await page.waitForSelector('.response-editor')
+  await page.waitForFunction(() => document.querySelector('.editor-spark button'), { timeout: 5000 })
+  if (sparkRequestCount !== 1) throw new Error(`Opening an unsaved card should request sparks once, saw ${sparkRequestCount}`)
+  const editorCard = await page.$eval('.active-card-wrap', (element) => {
+    const rect = element.getBoundingClientRect()
+    return { withinViewport: rect.top >= 0 && rect.bottom <= innerHeight && rect.left >= 0 && rect.right <= innerWidth }
+  })
+  if (!editorCard.withinViewport) throw new Error('Desktop writing card is cropped')
+
+  const response = 'The library becomes a weekly doorstep exchange where resident hosts bring one book and one conversation prompt to each street.'
+  await page.type('.response-editor', response)
+  await page.click('.response-submit')
+  await page.waitForSelector('.saved-pins')
+  await page.waitForSelector(`.table-card-shell[data-card-id="${dealtCardId}"] .change-card.is-face-down`)
+  const savedTableCard = await page.$eval(`.table-card-shell[data-card-id="${dealtCardId}"] .used-card-back`, (element) => element.innerText)
+  if (!savedTableCard.includes(response) || savedTableCard.includes('Note saved')) throw new Error('Saved table card does not show the authored idea cleanly')
+
+  await page.click(`.table-card-shell[data-card-id="${dealtCardId}"] .used-card-back`)
+  await page.waitForSelector(`.saved-review-card[data-card-id="${dealtCardId}"]`)
+  if (sparkRequestCount !== 1) throw new Error('Reviewing the saved table card made an additional model request')
+  await page.click('.saved-review-close')
+  await page.waitForSelector('.saved-review', { hidden: true })
+
+  await page.click('.deal-all-button')
+  await page.waitForFunction(() => document.querySelectorAll('.tabletop-canvas > .table-card-shell').length === 16)
+  const allCards = await page.$$eval('.tabletop-canvas > .table-card-shell', (cards) => ({
+    count: cards.length,
+    unique: new Set(cards.map((card) => card.dataset.cardId)).size,
+    titlesContained: cards.every((card) => {
+      const title = card.querySelector('.card-front strong')
+      const face = card.querySelector('.card-front')
+      if (!title || !face) return true
+      const titleRect = title.getBoundingClientRect()
+      const faceRect = face.getBoundingClientRect()
+      return titleRect.left >= faceRect.left - 1 && titleRect.right <= faceRect.right + 1 && titleRect.top >= faceRect.top - 1 && titleRect.bottom <= faceRect.bottom + 1
+    }),
+  }))
+  if (allCards.count !== 16 || allCards.unique !== 16 || !allCards.titlesContained) throw new Error(`Deal all produced a broken deck: ${JSON.stringify(allCards)}`)
+
+  await new Promise((resolve) => setTimeout(resolve, 1100))
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
+  await page.mouse.move(0, 0)
+  await new Promise((resolve) => setTimeout(resolve, 400))
+  const mobileTable = await page.$eval('.tabletop', (element) => ({
+    scrollable: element.scrollHeight > element.clientHeight,
+    cardCount: element.querySelectorAll('.tabletop-canvas > .table-card-shell').length,
+    horizontalOverflow: element.scrollWidth > element.clientWidth + 1,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    overflowers: [...element.querySelectorAll('*')].map((child) => {
+      const rect = child.getBoundingClientRect()
+      return { className: child.className, left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) }
+    }).filter((child) => child.right > innerWidth + 1 || child.left < -1).slice(0, 8),
+  }))
+  if (!mobileTable.scrollable || mobileTable.cardCount !== 16 || mobileTable.horizontalOverflow) {
+    throw new Error(`Mobile table does not expose the full deck cleanly: ${JSON.stringify(mobileTable)}`)
+  }
+  await page.$eval('.tabletop', (element) => {
+    element.style.scrollBehavior = 'auto'
+    element.scrollTop = element.scrollHeight
+  })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  const lastCard = await page.$eval('.tabletop-canvas > .table-card-shell:last-of-type', (element) => {
+    const rect = element.getBoundingClientRect()
+    const table = element.closest('.tabletop')
+    return { visible: rect.bottom > 60 && rect.top < innerHeight, top: rect.top, bottom: rect.bottom, scrollTop: table.scrollTop, scrollHeight: table.scrollHeight, clientHeight: table.clientHeight }
+  })
+  if (!lastCard.visible) throw new Error(`Mobile users cannot scroll to the final dealt cards: ${JSON.stringify(lastCard)}`)
+
+  if (consoleErrors.length) throw new Error(`Browser errors: ${consoleErrors.join(' | ')}`)
+  console.log(JSON.stringify({
+    landingPage: true,
+    tabletopStartsDirectly: true,
+    randomDealFlight: true,
+    unsavedCardIdeation: true,
+    savedCardReview: true,
+    reviewDoesNotGenerate: true,
+    dealAllUniqueCards: true,
+    mobileTableScrolls: true,
+    sparkRequestCount,
+  }, null, 2))
+} finally {
+  await browser.close()
 }
-
-console.log(JSON.stringify(result, null, 2))
-await browser.close()

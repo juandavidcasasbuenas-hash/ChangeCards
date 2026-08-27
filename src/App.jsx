@@ -185,21 +185,83 @@ async function requestSparks(payload, force = false) {
   return data.sparks
 }
 
+async function writeClipboard(text) {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable')
+    await navigator.clipboard.writeText(text)
+    return
+  } catch {
+    const fallback = document.createElement('textarea')
+    fallback.value = text
+    fallback.setAttribute('readonly', '')
+    fallback.style.position = 'fixed'
+    fallback.style.opacity = '0'
+    fallback.style.pointerEvents = 'none'
+    document.body.appendChild(fallback)
+    fallback.select()
+    fallback.setSelectionRange(0, fallback.value.length)
+    const copied = document.execCommand('copy')
+    fallback.remove()
+    if (!copied) throw new Error('Copy failed')
+  }
+}
+
+function formatSavedIdea(card, note) {
+  return `CHANGE CARD — ${card.title}\nQuestion: ${card.provocation}\n\nIDEA\n${note.trim()}`
+}
+
+function formatAllSavedIdeas(originalIdea, notes) {
+  const chronological = CARDS
+    .filter((card) => notes?.[card.id]?.visited && notes[card.id]?.note?.trim())
+    .sort((a, b) => (notes[a.id]?.updatedAt || 0) - (notes[b.id]?.updatedAt || 0))
+  const savedIdeas = chronological.map((card, index) => (
+    `${index + 1}. ${card.title}\nQuestion: ${card.provocation}\n\n${notes[card.id].note.trim()}`
+  ))
+  return `CHANGE CARDS\n\nORIGINAL IDEA\n${originalIdea.trim()}\n\nSAVED IDEAS\n\n${savedIdeas.join('\n\n')}`
+}
+
 function App() {
   const [session, setSession] = useState(loadSession)
-  const [activeCardId, setActiveCardId] = useState(null)
+  const [activeCard, setActiveCard] = useState(null)
+  const [copyFeedback, setCopyFeedback] = useState({ key: null, message: '' })
+  const activeTriggerRef = useRef(null)
+  const copyTimerRef = useRef(null)
 
   useEffect(() => {
     localStorage.setItem('change-cards-session-v1', JSON.stringify(session))
   }, [session])
 
+  useEffect(() => () => window.clearTimeout(copyTimerRef.current), [])
+
   const update = (patch) => setSession((current) => ({ ...current, ...patch }))
 
   const startAgain = () => {
     const next = { ...DEFAULT_SESSION }
-    setActiveCardId(null)
+    setActiveCard(null)
     setSession(next)
     sessionStorage.removeItem('change-cards-cache-v1')
+  }
+
+  const openCard = (cardId, mode, trigger) => {
+    activeTriggerRef.current = trigger instanceof HTMLElement ? trigger : document.activeElement
+    setActiveCard({ cardId, mode })
+  }
+
+  const closeCard = () => {
+    setActiveCard(null)
+    window.setTimeout(() => activeTriggerRef.current?.focus?.({ preventScroll: true }), 0)
+  }
+
+  const copyWithFeedback = async (key, value, successMessage) => {
+    window.clearTimeout(copyTimerRef.current)
+    try {
+      await writeClipboard(value)
+      setCopyFeedback({ key, message: successMessage })
+      copyTimerRef.current = window.setTimeout(() => setCopyFeedback({ key: null, message: '' }), 2200)
+    } catch {
+      setCopyFeedback({ key: 'error', message: 'Could not copy. Please try again.' })
+      copyTimerRef.current = window.setTimeout(() => setCopyFeedback({ key: null, message: '' }), 3200)
+    }
   }
 
   if (session.stage === 'intro' || !session.idea) {
@@ -212,9 +274,26 @@ function App() {
 
   return (
     <main className="app-shell mode-tabletop">
-      <TopBar onRestart={startAgain} savedCards={savedCards} onOpenSaved={setActiveCardId} />
-      <Tabletop session={session} update={update} activeId={activeCardId} setActiveId={setActiveCardId} />
-      <ProjectCredit compact appFooter hidden={Boolean(activeCardId)} />
+      <TopBar
+        onRestart={startAgain}
+        savedCards={savedCards}
+        onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+        onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
+        copied={copyFeedback.key === 'all'}
+      />
+      <Tabletop
+        session={session}
+        update={update}
+        activeCard={activeCard}
+        savedCards={savedCards}
+        openCard={openCard}
+        closeCard={closeCard}
+        setActiveCard={setActiveCard}
+        copyFeedback={copyFeedback}
+        onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
+      />
+      <span className="sr-only" role="status" aria-live="polite">{copyFeedback.message}</span>
+      <ProjectCredit compact appFooter hidden={Boolean(activeCard)} />
     </main>
   )
 }
@@ -329,22 +408,33 @@ function ProjectCredit({ compact = false, appFooter = false, hidden = false }) {
   )
 }
 
-function TopBar({ onRestart, savedCards, onOpenSaved }) {
+function CopyIcon({ copied = false }) {
+  return copied ? (
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.3 3.2 3.2 7.8-8" /></svg>
+  ) : (
+    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="3.5" width="9" height="11" rx="1" /><path d="M12.5 16.5h-8v-10" /></svg>
+  )
+}
+
+function TopBar({ onRestart, savedCards, onOpenSaved, onCopyAll, copied }) {
   return (
     <header className="topbar">
       <div className="topbar-workshop">
         <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
         {savedCards.length > 0 && (
           <nav className="saved-pins" aria-label={`${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}>
-            <span className="saved-pins-label">Saved</span>
+            <button className={`saved-copy-button ${copied ? 'is-copied' : ''}`} type="button" onClick={onCopyAll} aria-label="Copy all saved ideas" title="Copy all saved ideas">
+              <CopyIcon copied={copied} />
+              <span>{copied ? 'Copied' : 'Copy ideas'}</span>
+            </button>
             <div className="saved-pins-scroll">
               {savedCards.map((card) => (
                 <button
                   key={card.id}
                   type="button"
                   className={`saved-pin category-${card.category}`}
-                  onClick={() => onOpenSaved(card.id)}
-                  aria-label={`Open saved idea for ${card.title}`}
+                  onClick={(event) => onOpenSaved(card.id, event.currentTarget)}
+                  aria-label={`Review saved idea for ${card.title}`}
                   title={card.title}
                 >
                   <CardIcon id={card.id} />
@@ -370,9 +460,11 @@ function OriginalNote({ idea, compact = false }) {
   )
 }
 
-function Tabletop({ session, update, activeId, setActiveId }) {
+function Tabletop({ session, update, activeCard: activeState, savedCards, openCard: openActiveCard, closeCard, setActiveCard, copyFeedback, onCopyIdea }) {
   const canvasRef = useRef(null)
   const deckRef = useRef(null)
+  const modalRef = useRef(null)
+  const sparkRequestsRef = useRef(new Set())
   const [sparkStates, setSparkStates] = useState({})
   const [tableScrolled, setTableScrolled] = useState(false)
   const [dragOverDeck, setDragOverDeck] = useState(false)
@@ -389,7 +481,11 @@ function Tabletop({ session, update, activeId, setActiveId }) {
   const cardPositions = session.cardPositions || {}
   const notes = session.swarm || {}
   const remainingCards = CARDS.filter((card) => !dealtCardIds.includes(card.id))
-  const activeCard = CARDS.find((card) => card.id === activeId)
+  const activeCard = CARDS.find((card) => card.id === activeState?.cardId)
+  const activeMode = activeState?.mode
+  const reviewIndex = activeMode === 'review' ? savedCards.findIndex((card) => card.id === activeCard?.id) : -1
+  const previousSavedCard = reviewIndex > 0 ? savedCards[reviewIndex - 1] : null
+  const nextSavedCard = reviewIndex >= 0 && reviewIndex < savedCards.length - 1 ? savedCards[reviewIndex + 1] : null
 
   useEffect(() => {
     if (!activeCard) return undefined
@@ -401,12 +497,38 @@ function Tabletop({ session, update, activeId, setActiveId }) {
       document.documentElement.style.setProperty('--workshop-viewport-height', `${height}px`)
       document.documentElement.style.setProperty('--workshop-viewport-offset', `${offset}px`)
     }
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setActiveId(null)
+    const handleDialogKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeCard()
+        return
+      }
+      if (activeMode === 'review' && event.key === 'ArrowLeft' && previousSavedCard) {
+        event.preventDefault()
+        setActiveCard({ cardId: previousSavedCard.id, mode: 'review' })
+        return
+      }
+      if (activeMode === 'review' && event.key === 'ArrowRight' && nextSavedCard) {
+        event.preventDefault()
+        setActiveCard({ cardId: nextSavedCard.id, mode: 'review' })
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = [...(modalRef.current?.querySelectorAll('button:not(:disabled), textarea, [href], [tabindex]:not([tabindex="-1"])') || [])]
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     syncViewport()
     document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', closeOnEscape)
+    window.addEventListener('keydown', handleDialogKey)
     window.addEventListener('resize', syncViewport)
     viewport?.addEventListener('resize', syncViewport)
     viewport?.addEventListener('scroll', syncViewport)
@@ -414,12 +536,18 @@ function Tabletop({ session, update, activeId, setActiveId }) {
       document.body.style.overflow = previousOverflow
       document.documentElement.style.removeProperty('--workshop-viewport-height')
       document.documentElement.style.removeProperty('--workshop-viewport-offset')
-      window.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('keydown', handleDialogKey)
       window.removeEventListener('resize', syncViewport)
       viewport?.removeEventListener('resize', syncViewport)
       viewport?.removeEventListener('scroll', syncViewport)
     }
-  }, [activeCard])
+  }, [activeCard, activeMode, previousSavedCard, nextSavedCard, closeCard, setActiveCard])
+
+  useEffect(() => {
+    if (activeMode !== 'review') return undefined
+    const focusTimer = window.setTimeout(() => modalRef.current?.querySelector('.saved-review-close')?.focus({ preventScroll: true }), 420)
+    return () => window.clearTimeout(focusTimer)
+  }, [activeCard?.id, activeMode])
 
   const noteContext = useMemo(() => CARDS.flatMap((card) => {
     const note = notes[card.id]
@@ -545,7 +673,8 @@ function Tabletop({ session, update, activeId, setActiveId }) {
 
   async function ensureSparks(card, force = false) {
     const existing = sparkStates[card.id]
-    if (!force && (existing?.loading || existing?.sparks?.length)) return
+    if (sparkRequestsRef.current.has(card.id) || (!force && (existing?.loading || existing?.sparks?.length))) return
+    sparkRequestsRef.current.add(card.id)
     setSparkStates((current) => ({
       ...current,
       [card.id]: { cardId: card.id, loading: true, sparks: [], error: null },
@@ -568,20 +697,23 @@ function Tabletop({ session, update, activeId, setActiveId }) {
         ...current,
         [card.id]: { cardId: card.id, loading: false, sparks: [], error: error.message },
       }))
+    } finally {
+      sparkRequestsRef.current.delete(card.id)
     }
   }
 
   useEffect(() => {
-    if (activeCard) ensureSparks(activeCard)
-  }, [activeId])
+    if (activeCard && activeMode === 'edit') ensureSparks(activeCard)
+  }, [activeCard?.id, activeMode])
 
-  function openCard(card) {
+  function openCard(card, trigger) {
     if (coachStep !== 'complete') {
       setCoachStep('complete')
       try { localStorage.setItem('change-cards-onboarding-v2', 'complete') } catch { /* onboarding persistence is optional */ }
     }
-    setActiveId(card.id)
-    ensureSparks(card)
+    const mode = notes[card.id]?.visited ? 'review' : 'edit'
+    openActiveCard(card.id, mode, trigger)
+    if (mode === 'edit') ensureSparks(card)
   }
 
   function saveNote(card, note) {
@@ -595,7 +727,7 @@ function Tabletop({ session, update, activeId, setActiveId }) {
       },
     })
     setSparkStates({})
-    setActiveId(null)
+    closeCard()
   }
 
   return (
@@ -657,8 +789,8 @@ function Tabletop({ session, update, activeId, setActiveId }) {
               onDeckTarget={setDragOverDeck}
               onMobileDragStart={() => setMobileRearranging(true)}
               onMobileDragEnd={() => setMobileRearranging(false)}
-              onOpen={() => openCard(card)}
-              onWarm={() => ensureSparks(card)}
+              onOpen={(trigger) => openCard(card, trigger)}
+              onWarm={() => { if (!notes[card.id]?.visited) ensureSparks(card) }}
               showCoachmark={coachStep === 'card' && index === 0}
             />
           )
@@ -686,20 +818,44 @@ function Tabletop({ session, update, activeId, setActiveId }) {
       )}
 
       {activeCard && (
-        <div className="active-card-layer" role="dialog" aria-modal="true" aria-label={`${activeCard.title} workshop card`}>
-          <button className="active-card-scrim" onClick={() => setActiveId(null)} aria-label="Put card back on the table" />
-          <div className="active-card-wrap">
-            <ChangeCard card={activeCard} selected>
-              <GenerationSurface
+        <div
+          ref={modalRef}
+          className={`active-card-layer is-${activeMode}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeMode === 'review' ? undefined : `Edit idea with ${activeCard.title}`}
+          aria-labelledby={activeMode === 'review' ? `saved-review-title-${activeCard.id}` : undefined}
+        >
+          <button className="active-card-scrim" tabIndex={-1} onClick={closeCard} aria-label={activeMode === 'review' ? 'Close saved idea' : 'Put card back on the table'} />
+          <div className={`active-card-wrap ${activeMode === 'review' ? 'is-reviewing' : 'is-editing'}`}>
+            {activeMode === 'review' ? (
+              <SavedIdeaViewer
                 card={activeCard}
-                initialValue={notes[activeCard.id]?.note || ''}
-                submitLabel="Save idea →"
-                sparkState={sparkStates[activeCard.id]}
-                onSubmit={(response) => saveNote(activeCard, response)}
-                onRetry={() => ensureSparks(activeCard, true)}
-                onClose={() => setActiveId(null)}
+                note={notes[activeCard.id]?.note || ''}
+                index={reviewIndex}
+                count={savedCards.length}
+                previousCard={previousSavedCard}
+                nextCard={nextSavedCard}
+                copied={copyFeedback.key === `card-${activeCard.id}`}
+                onCopy={() => onCopyIdea(activeCard, notes[activeCard.id]?.note || '')}
+                onEdit={() => setActiveCard({ cardId: activeCard.id, mode: 'edit' })}
+                onClose={closeCard}
+                onPrevious={() => previousSavedCard && setActiveCard({ cardId: previousSavedCard.id, mode: 'review' })}
+                onNext={() => nextSavedCard && setActiveCard({ cardId: nextSavedCard.id, mode: 'review' })}
               />
-            </ChangeCard>
+            ) : (
+              <ChangeCard card={activeCard} selected>
+                <GenerationSurface
+                  card={activeCard}
+                  initialValue={notes[activeCard.id]?.note || ''}
+                  submitLabel="Save idea →"
+                  sparkState={sparkStates[activeCard.id]}
+                  onSubmit={(response) => saveNote(activeCard, response)}
+                  onRetry={() => ensureSparks(activeCard, true)}
+                  onClose={closeCard}
+                />
+              </ChangeCard>
+            )}
           </div>
         </div>
       )}
@@ -782,12 +938,12 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
       // Activate from pointerup, before the browser's nested-button click event.
       // This keeps a click reliable even when pointer capture is used for dragging.
       pointerActivated.current = true
-      onOpen()
+      onOpen(event.currentTarget.querySelector('.card-face'))
     }
     dragged.current = false
   }
 
-  function select() {
+  function select(event) {
     if (pointerActivated.current) {
       pointerActivated.current = false
       return
@@ -796,7 +952,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
       dragged.current = false
       return
     }
-    onOpen()
+    onOpen(event?.currentTarget)
   }
 
   function syncMobileDragOffset() {
@@ -1192,7 +1348,7 @@ function ChangeCard({ card, index = 0, selected, disabled, onSelect, children, s
           {children || (
             <button className="used-card-back" onClick={onSelect} aria-label={`Open ideas from ${card.title}`}>
               <CardIcon id={card.id} />
-              <span>{used ? 'Note saved' : 'Turn me over'}</span>
+              {!used && <span>Turn me over</span>}
               <strong>{card.title}</strong>
               {used && savedNote && <p className="saved-note">{savedNote}</p>}
             </button>
@@ -1213,6 +1369,60 @@ function CardIcon({ id }) {
       aria-hidden="true"
       style={{ '--card-icon-image': `url("/icons/change-cards/${filename}")` }}
     />
+  )
+}
+
+function SavedIdeaViewer({ card, note, index, count, previousCard, nextCard, copied, onCopy, onEdit, onClose, onPrevious, onNext }) {
+  const swipeStart = useRef(null)
+
+  const startSwipe = (event) => {
+    const touch = event.touches?.[0]
+    if (touch) swipeStart.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const finishSwipe = (event) => {
+    const start = swipeStart.current
+    const touch = event.changedTouches?.[0]
+    swipeStart.current = null
+    if (!start || !touch) return
+    const deltaX = touch.clientX - start.x
+    const deltaY = touch.clientY - start.y
+    if (Math.abs(deltaX) < 54 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
+    if (deltaX > 0 && previousCard) onPrevious()
+    if (deltaX < 0 && nextCard) onNext()
+  }
+
+  return (
+    <section className="saved-review" onTouchStart={startSwipe} onTouchEnd={finishSwipe}>
+      <button className="saved-review-close" type="button" onClick={onClose} aria-label="Close saved idea">×</button>
+      <article className={`saved-review-card category-${card.category}`} data-card-id={card.id}>
+        <header className="saved-review-heading">
+          <span>{card.label}</span>
+          <CardIcon id={card.id} />
+          <h2 id={`saved-review-title-${card.id}`}>{card.title}</h2>
+        </header>
+        <div className="saved-review-question">
+          <span>The question</span>
+          <p>{card.provocation}</p>
+        </div>
+        <div className="saved-review-idea">
+          <span>Your idea</span>
+          <p>{note}</p>
+        </div>
+        <footer className="saved-review-actions">
+          <button className={`saved-review-copy ${copied ? 'is-copied' : ''}`} type="button" onClick={onCopy}>
+            <CopyIcon copied={copied} />
+            <span>{copied ? 'Copied' : 'Copy idea'}</span>
+          </button>
+          <button className="saved-review-edit" type="button" onClick={onEdit}><span aria-hidden="true">✎</span> Edit</button>
+        </footer>
+      </article>
+      <nav className="saved-review-navigation" aria-label="Browse saved ideas">
+        <button type="button" onClick={onPrevious} disabled={!previousCard} aria-label={previousCard ? `Previous saved idea: ${previousCard.title}` : 'No previous saved idea'}>←</button>
+        <span>{index + 1} of {count}</span>
+        <button type="button" onClick={onNext} disabled={!nextCard} aria-label={nextCard ? `Next saved idea: ${nextCard.title}` : 'No next saved idea'}>→</button>
+      </nav>
+    </section>
   )
 }
 

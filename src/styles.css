@@ -306,7 +306,27 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .project-credit.is-app-footer.is-hidden { opacity: 0; visibility: hidden; }
 .logo-button { flex: 0 0 auto; }
 .saved-pins { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.saved-pins-label, .saved-pins-count { color: var(--muted); font: 500 7px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
+.saved-copy-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 78px;
+  min-height: 34px;
+  border: 0;
+  padding: 4px 2px;
+  color: var(--muted);
+  background: transparent;
+  font: 500 9px/1 'DM Mono';
+  letter-spacing: .055em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease, transform 160ms ease;
+}
+.saved-copy-button svg, .saved-review-copy svg { width: 16px; height: 16px; overflow: visible; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
+.saved-copy-button:hover, .saved-copy-button:focus-visible { color: var(--ink); transform: translateY(-1px); }
+.saved-copy-button.is-copied { color: var(--violet); }
+.saved-pins-count { color: var(--muted); font: 500 7px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
 .saved-pins-scroll {
   display: flex;
   align-items: center;
@@ -567,7 +587,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .table-card-shell .card-front strong { font-size: clamp(13px, 1.12vw, 18px); -webkit-line-clamp: 3; }
 .table-card-shell .change-card.is-face-down .card-back { color: var(--paper-light); background: var(--saved-card); }
 .table-card-shell .change-card.is-face-down .used-card-back { color: var(--paper-light); background: var(--saved-card); cursor: pointer; }
-.table-card-shell .change-card.is-face-down .used-card-back { display: grid; grid-template-rows: auto auto auto 1fr; align-items: start; gap: 5px; padding: 10px; }
+.table-card-shell .change-card.is-face-down .used-card-back { display: grid; grid-template-rows: auto auto 1fr; align-items: start; gap: 7px; padding: 10px; }
 .table-card-shell .change-card.is-face-down .used-card-back .card-icon { width: 25px; height: 25px; }
 .table-card-shell .change-card.is-face-down .used-card-back > span { font-size: 6px; opacity: .68; }
 .table-card-shell .change-card.is-face-down .used-card-back strong { font-size: clamp(10px, .82vw, 13px); line-height: .98; }
@@ -580,6 +600,60 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .active-card-wrap .change-card.is-selected .card-front { visibility: hidden; pointer-events: none; }
 .active-card-wrap .change-card.is-selected .card-back { transform: none; backface-visibility: visible; -webkit-backface-visibility: visible; pointer-events: auto; }
 .active-card-wrap .change-card:not(.swarm-card).is-selected .card-back { box-shadow: inset 0 8px 0 var(--card-color), 0 34px 80px rgba(23,23,19,.34); }
+.active-card-wrap.is-reviewing {
+  width: min(510px, calc(100vw - 42px));
+  height: min(760px, calc(var(--workshop-viewport-height, 100dvh) - 50px));
+}
+.saved-review {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  animation: liftCard 520ms cubic-bezier(.18,.82,.2,1) both;
+  touch-action: pan-y;
+}
+.saved-review-card {
+  --card-color: var(--blue);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: clamp(16px, 2.6dvh, 24px);
+  min-height: 0;
+  border: 1px solid rgba(23,23,19,.7);
+  border-radius: 10px;
+  padding: clamp(28px, 4.2dvh, 40px) clamp(25px, 5vw, 42px) clamp(22px, 3.4dvh, 30px);
+  overflow: hidden;
+  color: var(--paper-light);
+  background: var(--saved-card);
+  box-shadow: inset 0 9px 0 var(--card-color), 0 34px 80px rgba(23,23,19,.34);
+}
+.saved-review-card.category-multidisciplinary { --card-color: var(--blue); }
+.saved-review-card.category-ingenious { --card-color: var(--red); }
+.saved-review-card.category-optimistic { --card-color: var(--yellow); }
+.saved-review-card.category-flexible { --card-color: var(--green); }
+.saved-review-heading { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: start; gap: 8px 18px; }
+.saved-review-heading > span { color: rgba(250,247,237,.68); font: 500 9px/1.2 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
+.saved-review-heading .card-icon { grid-column: 2; grid-row: 1 / span 2; width: clamp(66px, 8vw, 88px); height: clamp(66px, 8vw, 88px); }
+.saved-review-heading h2 { align-self: end; max-width: 10ch; margin: 0; font: 600 clamp(31px, 4vw, 47px)/.9 'DM Sans'; letter-spacing: -.06em; text-transform: uppercase; text-wrap: balance; }
+.saved-review-question { padding-top: 16px; border-top: 1px solid rgba(250,247,237,.28); }
+.saved-review-question span, .saved-review-idea span { display: block; margin-bottom: 7px; color: rgba(250,247,237,.6); font: 500 8px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
+.saved-review-question p { margin: 0; font: 700 clamp(18px, 2.4vw, 24px)/1.08 var(--display-font); text-wrap: pretty; }
+.saved-review-idea { min-height: 0; padding: 15px 16px 18px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; color: var(--ink); background: rgba(250,247,237,.92); box-shadow: inset 3px 3px 0 rgba(23,23,19,.08); scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.saved-review-idea span { color: rgba(23,23,19,.5); }
+.saved-review-idea p { margin: 0; overflow-wrap: anywhere; font: 500 clamp(16px, 2vw, 19px)/1.42 'DM Sans'; white-space: pre-wrap; }
+.saved-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.saved-review-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid rgba(250,247,237,.7); padding: 10px 14px; color: var(--paper-light); background: transparent; font: 500 10px/1 'DM Mono'; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: color 160ms ease, background 160ms ease, transform 160ms ease; }
+.saved-review-actions button:hover, .saved-review-actions button:focus-visible { color: var(--ink); background: var(--paper-light); transform: translateY(-2px); }
+.saved-review-actions .saved-review-copy.is-copied { color: var(--paper-light); border-color: var(--card-color); background: color-mix(in srgb, var(--card-color) 45%, transparent); }
+.saved-review-close { position: absolute; z-index: 3; top: 14px; right: 14px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; padding: 0; color: var(--paper-light); background: transparent; font: 400 27px/1 'DM Sans'; cursor: pointer; transition: rotate 180ms ease, opacity 160ms ease; }
+.saved-review-close:hover, .saved-review-close:focus-visible { rotate: 90deg; }
+.saved-review-navigation { display: grid; grid-template-columns: 44px auto 44px; align-items: center; justify-content: center; gap: 14px; color: var(--paper-light); }
+.saved-review-navigation button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(250,247,237,.58); border-radius: 50%; padding: 0; color: inherit; background: rgba(23,23,19,.22); backdrop-filter: blur(5px); font-size: 20px; cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
+.saved-review-navigation button:hover:not(:disabled), .saved-review-navigation button:focus-visible:not(:disabled) { background: rgba(250,247,237,.22); transform: translateY(-2px); }
+.saved-review-navigation button:disabled { opacity: .24; cursor: default; }
+.saved-review-navigation span { min-width: 54px; font: 500 9px/1 'DM Mono'; letter-spacing: .07em; text-align: center; text-transform: uppercase; }
 @keyframes tableDim { from { opacity: 0; } }
 @keyframes liftCard { from { opacity: 0; transform: translateY(70px) scale(.8) rotate(-4deg); } }
 @keyframes sparkWaves { 0%, 100% { opacity: .1; transform: translateX(-4px) rotate(-5deg) scale(.86); } 50% { opacity: .3; transform: translateX(8px) rotate(3deg) scale(1.04); } }
@@ -946,7 +1020,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .project-credit.is-compact .credit-separator,
   .project-credit.is-compact .credit-context { display: none; }
   .saved-pins { flex: 1; gap: 4px; min-width: 0; }
-  .saved-pins-label { display: none; }
+  .saved-copy-button { gap: 4px; min-width: 70px; min-height: 40px; padding-inline: 1px; font-size: 8px; touch-action: manipulation; }
+  .saved-copy-button svg { width: 14px; height: 14px; }
   .saved-pins-scroll { flex: 1; max-width: none; padding: 4px 10px; }
   .saved-pin { flex-basis: 27px; width: 27px; height: 38px; padding: 4px; }
   .saved-pin .card-icon { width: 17px; height: 21px; }
@@ -1160,6 +1235,21 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
     max-height: calc(var(--workshop-viewport-height, 100dvh) - 16px);
     margin: auto;
   }
+  .active-card-wrap.is-reviewing { width: min(430px, 100%); height: min(760px, calc(var(--workshop-viewport-height, 100dvh) - 16px)); }
+  .saved-review { gap: 8px; }
+  .saved-review-card { gap: clamp(12px, 2.2dvh, 18px); padding: clamp(25px, 4.2dvh, 34px) 22px clamp(18px, 3dvh, 24px); }
+  .saved-review-heading { gap: 6px 12px; }
+  .saved-review-heading > span { padding-right: 34px; font-size: 8px; }
+  .saved-review-heading .card-icon { width: clamp(56px, 18vw, 75px); height: clamp(56px, 18vw, 75px); }
+  .saved-review-heading h2 { font-size: clamp(28px, 9vw, 39px); }
+  .saved-review-question { padding-top: 12px; }
+  .saved-review-question p { font-size: clamp(17px, 5.3vw, 22px); }
+  .saved-review-idea { padding: 13px 14px 16px; }
+  .saved-review-idea p { font-size: clamp(15px, 4.2vw, 18px); line-height: 1.4; }
+  .saved-review-actions button { flex: 1; min-height: 46px; padding: 10px 8px; font-size: 9px; touch-action: manipulation; }
+  .saved-review-close { top: 7px; right: 7px; touch-action: manipulation; }
+  .saved-review-navigation { grid-template-columns: 44px auto 44px; gap: 12px; }
+  .saved-review-navigation button { touch-action: manipulation; }
   .active-card-wrap .change-card:not(.swarm-card).is-selected { width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; }
   .active-card-wrap .card-face { border-radius: 9px; }
   .active-card-wrap .generation-surface {
