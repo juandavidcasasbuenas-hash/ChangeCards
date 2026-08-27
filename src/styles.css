@@ -283,8 +283,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   backdrop-filter: blur(10px);
 }
 .topbar-workshop { display: flex; align-items: center; gap: 22px; min-width: 0; }
-.topbar-meta { display: flex; flex: 0 0 auto; align-items: center; gap: clamp(16px, 2.5vw, 34px); min-width: 0; }
-.project-credit.is-compact { justify-self: auto; gap: 7px; color: rgba(23,23,19,.56); font-size: 10px; white-space: nowrap; }
+.project-credit.is-compact { flex: 0 0 auto; justify-self: auto; gap: 7px; color: rgba(23,23,19,.56); font-size: 10px; white-space: nowrap; }
 .project-credit.is-compact .credit-prefix { font-size: 0; }
 .project-credit.is-compact .credit-prefix::before { content: 'By '; font-size: 10px; }
 .logo-button { flex: 0 0 auto; }
@@ -924,7 +923,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .topbar-workshop { flex: 1; gap: 11px; min-width: 0; }
   .topbar .logo { font-size: 17px; }
   .topbar .text-button { display: none; }
-  .topbar-meta { max-width: 47vw; }
   .project-credit.is-compact { display: block; max-width: 100%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; }
   .project-credit.is-compact .credit-prefix { display: none; }
   .project-credit.is-compact .credit-separator,

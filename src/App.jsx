@@ -333,6 +333,7 @@ function TopBar({ onRestart, savedCards, onOpenSaved }) {
     <header className="topbar">
       <div className="topbar-workshop">
         <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
+        <ProjectCredit compact />
         {savedCards.length > 0 && (
           <nav className="saved-pins" aria-label={`${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}>
             <span className="saved-pins-label">Saved</span>
@@ -354,10 +355,7 @@ function TopBar({ onRestart, savedCards, onOpenSaved }) {
           </nav>
         )}
       </div>
-      <div className="topbar-meta">
-        <ProjectCredit compact />
-        <button className="text-button" onClick={onRestart}>New idea ↗</button>
-      </div>
+      <button className="text-button" onClick={onRestart}>New idea ↗</button>
     </header>
   )
 }
