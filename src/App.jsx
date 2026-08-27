@@ -40,6 +40,43 @@ const CARD_ICON_FILES = [
   '16-let-the-intruder-in.png',
 ]
 
+// Curated rather than generated at runtime: the landing page can feel alive
+// immediately, without spending a request before the workshop has even begun.
+const IDEA_EXAMPLES = [
+  'A calmer handover for nurses finishing a night shift.',
+  'A neighbourhood tool library run by retired engineers.',
+  'A podcast that helps teenagers understand local politics.',
+  'A low-waste menu for a busy family-owned restaurant.',
+  'A museum trail designed with people who rarely visit museums.',
+  'A better first week for children starting secondary school.',
+  'A repair service for outdoor clothing that people love using.',
+  'A climate workshop that farmers would genuinely recommend.',
+  'A rehearsal process that gives every performer a real voice.',
+  'A simple way for renters to improve their shared street.',
+  'A safer late-night journey home for hospitality workers.',
+  'A library service for people who never think to enter a library.',
+  'A research conference where the public shapes the questions.',
+  'A return-to-work programme for parents after extended leave.',
+  'A football club that makes new supporters feel they belong.',
+  'A financial app that works for people with unpredictable income.',
+  'A community garden that stays lively through the winter.',
+  'A science lesson built around the mysteries in a local park.',
+  'A more humane way to wait for an outpatient appointment.',
+  'A market stall that makes unfamiliar vegetables irresistible.',
+  'A local news service designed for people short on time.',
+  'An apprenticeship shaped jointly by students and small businesses.',
+  'A music venue that neighbours are glad to live beside.',
+  'A welcoming fitness class for people who dislike exercise.',
+  'A digital archive that families can explore together.',
+  'A staff meeting that gives quiet thinkers room to contribute.',
+  'A circular packaging system for independent coffee shops.',
+  'A housing consultation that young renters choose to attend.',
+  'A playful way to help adults learn a new language.',
+  'A public square that still feels inviting in bad weather.',
+  'A mentoring network for first-generation university students.',
+  'A better way for neighbours to share care during a heatwave.',
+]
+
 const SWARM_CARD_POSITIONS = [
   [3, 23, -4], [24, 22, 2], [63, 22, -2], [85, 23, 4],
   [3, 42, 2], [19, 42, -3], [70, 42, 3], [86, 42, -2],
@@ -183,6 +220,36 @@ function App() {
 
 function Entry({ session, update }) {
   const [draft, setDraft] = useState(session.idea)
+  const [exampleIndex, setExampleIndex] = useState(() => Math.floor(Math.random() * IDEA_EXAMPLES.length))
+  const [typedExample, setTypedExample] = useState('')
+  const [typingPhase, setTypingPhase] = useState('typing')
+
+  useEffect(() => {
+    if (draft) return undefined
+    const example = IDEA_EXAMPLES[exampleIndex]
+    let delay = 36 + Math.random() * 28
+    let next = () => setTypedExample(example.slice(0, typedExample.length + 1))
+
+    if (typingPhase === 'typing' && typedExample === example) {
+      delay = 2300
+      next = () => setTypingPhase('erasing')
+    } else if (typingPhase === 'erasing' && typedExample) {
+      delay = 16
+      next = () => setTypedExample((current) => current.slice(0, -1))
+    } else if (typingPhase === 'erasing') {
+      delay = 320
+      next = () => {
+        setExampleIndex((current) => {
+          const offset = 1 + Math.floor(Math.random() * (IDEA_EXAMPLES.length - 1))
+          return (current + offset) % IDEA_EXAMPLES.length
+        })
+        setTypingPhase('typing')
+      }
+    }
+
+    const timer = window.setTimeout(next, delay)
+    return () => window.clearTimeout(timer)
+  }, [draft, exampleIndex, typedExample, typingPhase])
 
   const submit = (event) => {
     event.preventDefault()
@@ -225,9 +292,11 @@ function Entry({ session, update }) {
                 value={draft}
                 maxLength={1000}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="A public engagement programme connecting laboratory scientists with local communities."
+                placeholder={typedExample}
+                aria-describedby="idea-example-description"
                 autoFocus
               />
+              <span id="idea-example-description" className="sr-only">The example text changes automatically. Enter your own idea in any field or discipline.</span>
               <span className="character-count">{draft.length} / 1000</span>
             </div>
             <button className="ink-button" type="submit" disabled={!draft.trim()}>
@@ -293,6 +362,7 @@ function Tabletop({ session, update, activeId, setActiveId }) {
   const canvasRef = useRef(null)
   const deckRef = useRef(null)
   const [sparkStates, setSparkStates] = useState({})
+  const [tableScrolled, setTableScrolled] = useState(false)
   const [dragOverDeck, setDragOverDeck] = useState(false)
   const [mobileRearranging, setMobileRearranging] = useState(false)
   const [dealFlight, setDealFlight] = useState(null)
@@ -517,7 +587,11 @@ function Tabletop({ session, update, activeId, setActiveId }) {
   }
 
   return (
-    <section className={`tabletop ${mobileRearranging ? 'is-rearranging' : ''}`} aria-label="Change Cards idea table">
+    <section
+      className={`tabletop ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''}`}
+      aria-label="Change Cards idea table"
+      onScroll={(event) => setTableScrolled(event.currentTarget.scrollTop > 32)}
+    >
       <aside className={`side-deck ${dragOverDeck ? 'is-drop-target' : ''} ${coachStep === 'deck' ? 'is-coaching-deck' : ''}`} ref={deckRef} aria-label="Card deck">
         <button
           type="button"
@@ -1191,43 +1265,46 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
           <p>{card.provocation}</p>
         </div>
         <label className="sr-only" htmlFor={`response-${card.id}`}>Write the next version of your idea</label>
-        <textarea
-          id={`response-${card.id}`}
-          ref={editorRef}
-          className="response-editor"
-          value={draft}
-          maxLength={1000}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault()
-              saveDraft()
-            }
-          }}
-          placeholder="Start rough. One changed detail is enough…"
-        />
-        <div className={`spark-cloud ${sparkState?.loading ? 'is-catching' : ''}`} aria-label="AI-generated subject-specific writing prompts" aria-live="polite">
+        <div className={`response-editor-shell ${sparkState?.loading ? 'is-catching' : ''}`}>
+          <textarea
+            id={`response-${card.id}`}
+            ref={editorRef}
+            className="response-editor"
+            value={draft}
+            maxLength={1000}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault()
+                saveDraft()
+              }
+            }}
+            placeholder="Start rough. One changed detail is enough…"
+          />
           <span className="spark-dust" aria-hidden="true">
             {Array.from({ length: 9 }, (_, index) => <i key={index}>✦</i>)}
           </span>
-          {sparkState?.loading ? (
-            <div className="spark-catcher" role="status" aria-label="Generating a spark"><i>✦</i></div>
-          ) : sparkState?.error ? (
-            <button className="spark-retry" type="button" onClick={onRetry}>No sparks landed · try again ↻</button>
-          ) : sparks.length ? (
-            <div className="spark-single-stage" data-spark-count={sparks.length} onMouseEnter={() => setSparkPaused(true)} onMouseLeave={() => setSparkPaused(false)}>
+          <div className="editor-spark" aria-label="AI-generated subject-specific writing prompts" aria-live="polite">
+            {sparkState?.loading ? (
+              <span className="editor-spark-loading" role="status"><i aria-hidden="true">✦</i> Catching a thought…</span>
+            ) : sparkState?.error ? (
+              <button className="spark-retry" type="button" onClick={onRetry}>Try another spark ↻</button>
+            ) : sparks.length ? (
               <button
                 type="button"
                 data-spark={sparks[sparkIndex]}
                 className={`${sparkVisible ? 'is-visible' : ''} ${takenSparks.includes(sparks[sparkIndex]) ? 'is-taken' : ''}`}
                 onFocus={() => setSparkPaused(true)}
                 onBlur={() => setSparkPaused(false)}
+                onMouseEnter={() => setSparkPaused(true)}
+                onMouseLeave={() => setSparkPaused(false)}
                 onClick={() => takeSpark(sparks[sparkIndex])}
+                aria-label={`Use this spark: ${sparks[sparkIndex]}`}
               >
                 <span aria-hidden="true">✦</span>{sparks[sparkIndex]}
-              </button>             
-            </div>
-          ) : null}
+              </button>
+            ) : null}
+          </div>
         </div>
       </form>
       <div className="response-submit-dock">
