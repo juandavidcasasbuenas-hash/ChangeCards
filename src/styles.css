@@ -44,7 +44,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .entry-page {
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   min-height: 100svh;
   padding: 28px clamp(24px, 4vw, 68px) 24px;
   overflow: hidden;
@@ -219,6 +219,22 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .idea-form .ink-button { margin-top: 28px; }
 .ink-button:not(:disabled):hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--violet); }
+
+.entry-credit {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  gap: 8px;
+  color: rgba(23,23,19,.48);
+  font: 400 8px/1.4 'DM Mono', monospace;
+  letter-spacing: .025em;
+}
+.entry-credit i { color: var(--violet); font-style: normal; }
+.entry-credit a { color: inherit; text-decoration: none; text-decoration-color: rgba(115,92,148,.42); text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
+.entry-credit a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--violet); }
+.entry-credit a:focus-visible { border-radius: 1px; outline: 2px solid #1572a1; outline-offset: 3px; }
 
 .mode-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(18px, 3vw, 36px); perspective: 1200px; }
 .mode-card {
@@ -891,6 +907,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .entry-content::before { inset: -4% -16%; opacity: 0.94; }
   .entry-copy h1 { font-size: clamp(46px, 13.2vw, 64px); line-height: 0.9; }
   .idea-form textarea { min-height: 180px; padding: 28px 22px 42px; font-size: 16px; }
+  .entry-credit { justify-self: start; flex-wrap: wrap; gap: 2px 7px; max-width: 34em; font-size: 7px; }
   .mode-choice { grid-template-columns: 1fr 1fr; gap: 12px; }
   .mode-card { min-height: 370px; padding: 18px; }
   .mode-card + .mode-card { margin-top: 22px; }

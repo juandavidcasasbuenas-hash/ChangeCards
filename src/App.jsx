@@ -305,6 +305,11 @@ function Entry({ session, update }) {
         </form>
       </section>
 
+      <footer className="entry-credit" aria-label="About Change Cards">
+        <span>A small experiment by <a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas</a></span>
+        <i aria-hidden="true">·</i>
+        <span>Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
+      </footer>
     </main>
   )
 }
