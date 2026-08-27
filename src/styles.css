@@ -716,12 +716,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .provocation-copy p { margin: 0; font: 700 clamp(25px, 2.1vw, 32px)/1.03 var(--display-font); letter-spacing: -.015em; }
 .response-editor-shell { position: relative; min-height: 230px; overflow: hidden; border-bottom: 2px solid var(--ink); background: transparent; transition: border-color 180ms ease, background 180ms ease; }
 .response-editor-shell:focus-within { border-color: var(--card-color); background: rgba(255,255,255,.34); }
-.response-editor { position: relative; z-index: 1; display: block; width: 100%; min-height: 230px; resize: none; border: 0; padding: 17px 4px 72px; background: transparent; box-shadow: none; font: 500 17px/1.42 'DM Sans'; }
+.response-editor { position: relative; z-index: 1; display: block; width: 100%; min-height: 230px; resize: none; border: 0; padding: 17px 4px 92px; background: transparent; box-shadow: none; font: 500 17px/1.42 'DM Sans'; }
 .response-editor:focus { border-color: transparent; background: transparent; box-shadow: none; outline: 0; }
 .response-editor::placeholder { color: rgba(23,23,19,.32); }
 .response-editor-shell .spark-dust { z-index: 2; inset: auto 0 0; height: 58px; }
-.editor-spark { pointer-events: none; position: absolute; z-index: 3; right: 0; bottom: 0; left: 0; display: flex; align-items: flex-end; min-height: 62px; padding: 12px 8px 13px; background: linear-gradient(180deg, transparent, rgba(250,246,233,.8) 52%, rgba(250,246,233,.95)); }
-.editor-spark button { pointer-events: auto; max-width: 100%; border: 0; padding: 3px 22px 3px 2px; overflow: hidden; color: rgba(23,23,19,.5); background: transparent; font: italic 700 clamp(14px, 1.25vw, 17px)/1.22 var(--display-font); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; opacity: 0; filter: blur(3px); translate: -8px 2px; transition: opacity 650ms ease, filter 650ms ease, translate 900ms cubic-bezier(.22,1,.36,1), color 180ms ease; }
+.editor-spark { pointer-events: none; position: absolute; z-index: 3; right: 0; bottom: 0; left: 0; display: flex; align-items: flex-end; min-height: 78px; padding: 14px 8px 13px; background: linear-gradient(180deg, transparent, rgba(250,246,233,.8) 48%, rgba(250,246,233,.95)); }
+.editor-spark button { pointer-events: auto; display: block; width: 100%; max-width: 100%; border: 0; padding: 3px 6px 3px 2px; overflow: visible; overflow-wrap: anywhere; color: rgba(23,23,19,.5); background: transparent; font: italic 700 clamp(14px, 1.25vw, 17px)/1.22 var(--display-font); text-align: left; text-wrap: pretty; white-space: normal; cursor: pointer; opacity: 0; filter: blur(3px); translate: -8px 2px; transition: opacity 650ms ease, filter 650ms ease, translate 900ms cubic-bezier(.22,1,.36,1), color 180ms ease; }
 .editor-spark button > span { display: inline-block; margin-right: 8px; color: var(--spark-ink); font: normal 11px/1 'DM Sans'; animation: sparkTwinkle 2.3s ease-in-out infinite; }
 .editor-spark button.is-visible { opacity: .86; filter: blur(0); translate: 0 0; }
 .editor-spark button:hover, .editor-spark button:focus-visible { color: var(--ink); outline-offset: 2px; }
@@ -1132,9 +1132,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .active-card-wrap .provocation-copy { padding: 4px 30px 1px 0; }
   .active-card-wrap .provocation-copy p { font-size: clamp(21px, 6.3vw, 27px); line-height: 1.02; }
   .active-card-wrap .response-editor-shell { min-height: clamp(136px, 24dvh, 210px); }
-  .active-card-wrap .response-editor { min-height: clamp(136px, 24dvh, 210px); padding: 13px 4px 72px; font-size: 16px; line-height: 1.38; touch-action: pan-y; }
-  .active-card-wrap .editor-spark { min-height: 60px; padding: 10px 5px 12px; }
-  .active-card-wrap .editor-spark button { min-height: 42px; padding: 9px 22px 8px 2px; font-size: clamp(14px, 4vw, 17px); white-space: normal; touch-action: manipulation; }
+  .active-card-wrap .response-editor { min-height: clamp(136px, 24dvh, 210px); padding: 13px 4px 102px; font-size: 16px; line-height: 1.38; touch-action: pan-y; }
+  .active-card-wrap .editor-spark { min-height: 88px; padding: 12px 5px 12px; }
+  .active-card-wrap .editor-spark button { min-height: 42px; padding: 8px 6px 7px 2px; font-size: clamp(13px, 3.7vw, 16px); line-height: 1.18; white-space: normal; touch-action: manipulation; }
   .active-card-wrap .spark-cloud { min-height: 86px; }
   .active-card-wrap .spark-single-stage { min-height: 72px; }
   .active-card-wrap .spark-single-stage button { min-height: 44px; padding: 9px 6px; font-size: clamp(16px, 4.7vw, 20px); touch-action: manipulation; }
@@ -1231,6 +1231,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .tabletop-canvas > .original-note { top: 8px; left: auto; width: calc(100% - 88px); min-height: 118px; margin-left: 88px; padding: 18px 15px 16px; }
   .tabletop-canvas > .original-note p { font-size: clamp(11px, 3.2vw, 14px); -webkit-line-clamp: 5; }
   .tabletop.is-rearranging .side-deck { top: 66px; }
+  .active-card-wrap .response-editor { padding-bottom: 76px; }
+  .active-card-wrap .editor-spark { min-height: 68px; padding-block: 7px 8px; }
+  .active-card-wrap .editor-spark button { padding-block: 5px; font-size: 13px; line-height: 1.14; }
 }
 
 @media (prefers-reduced-motion: reduce) {
