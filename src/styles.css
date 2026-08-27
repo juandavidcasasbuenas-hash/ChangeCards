@@ -220,21 +220,21 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .idea-form .ink-button { margin-top: 28px; }
 .ink-button:not(:disabled):hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--violet); }
 
-.entry-credit {
+.project-credit {
   position: relative;
   z-index: 2;
   display: flex;
   justify-self: end;
   align-items: center;
-  gap: 8px;
-  color: rgba(23,23,19,.48);
-  font: 400 8px/1.4 'DM Mono', monospace;
-  letter-spacing: .025em;
+  gap: 9px;
+  color: rgba(23,23,19,.62);
+  font: 400 11px/1.45 'DM Mono', monospace;
+  letter-spacing: .012em;
 }
-.entry-credit i { color: var(--violet); font-style: normal; }
-.entry-credit a { color: inherit; text-decoration: none; text-decoration-color: rgba(115,92,148,.42); text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
-.entry-credit a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--violet); }
-.entry-credit a:focus-visible { border-radius: 1px; outline: 2px solid #1572a1; outline-offset: 3px; }
+.project-credit i { color: var(--violet); font-style: normal; }
+.project-credit a { color: var(--ink); font-weight: 500; text-decoration: underline; text-decoration-color: rgba(115,92,148,.46); text-decoration-thickness: 1px; text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
+.project-credit a:hover { color: var(--violet); text-decoration-color: var(--violet); }
+.project-credit a:focus-visible { border-radius: 1px; outline: 2px solid #1572a1; outline-offset: 3px; }
 
 .mode-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(18px, 3vw, 36px); perspective: 1200px; }
 .mode-card {
@@ -283,6 +283,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   backdrop-filter: blur(10px);
 }
 .topbar-workshop { display: flex; align-items: center; gap: 22px; min-width: 0; }
+.topbar-meta { display: flex; flex: 0 0 auto; align-items: center; gap: clamp(16px, 2.5vw, 34px); min-width: 0; }
+.project-credit.is-compact { justify-self: auto; gap: 7px; color: rgba(23,23,19,.56); font-size: 10px; white-space: nowrap; }
+.project-credit.is-compact .credit-prefix { font-size: 0; }
+.project-credit.is-compact .credit-prefix::before { content: 'By '; font-size: 10px; }
 .logo-button { flex: 0 0 auto; }
 .saved-pins { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .saved-pins-label, .saved-pins-count { color: var(--muted); font: 500 7px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
@@ -909,7 +913,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .entry-content::before { inset: -4% -16%; opacity: 0.94; }
   .entry-copy h1 { font-size: clamp(46px, 13.2vw, 64px); line-height: 0.9; }
   .idea-form textarea { min-height: 180px; padding: 28px 22px 42px; font-size: 16px; }
-  .entry-credit { justify-self: start; flex-wrap: wrap; gap: 2px 7px; max-width: 34em; font-size: 7px; }
+  .project-credit { justify-self: start; flex-wrap: wrap; gap: 3px 7px; max-width: 36em; font-size: 10px; line-height: 1.5; }
   .mode-choice { grid-template-columns: 1fr 1fr; gap: 12px; }
   .mode-card { min-height: 370px; padding: 18px; }
   .mode-card + .mode-card { margin-top: 22px; }
@@ -920,6 +924,11 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .topbar-workshop { flex: 1; gap: 11px; min-width: 0; }
   .topbar .logo { font-size: 17px; }
   .topbar .text-button { display: none; }
+  .topbar-meta { max-width: 47vw; }
+  .project-credit.is-compact { display: block; max-width: 100%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; }
+  .project-credit.is-compact .credit-prefix { display: none; }
+  .project-credit.is-compact .credit-separator,
+  .project-credit.is-compact .credit-context { display: none; }
   .saved-pins { flex: 1; gap: 4px; min-width: 0; }
   .saved-pins-label { display: none; }
   .saved-pins-scroll { flex: 1; max-width: none; padding: 4px 10px; }

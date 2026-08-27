@@ -305,11 +305,7 @@ function Entry({ session, update }) {
         </form>
       </section>
 
-      <footer className="entry-credit" aria-label="About Change Cards">
-        <span>A small experiment by <a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas</a></span>
-        <i aria-hidden="true">·</i>
-        <span>Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
-      </footer>
+      <ProjectCredit />
     </main>
   )
 }
@@ -319,6 +315,16 @@ function Logo() {
     <span className="logo" aria-label="Change Cards">
       <span>CHANGE</span><span>CARDS</span>
     </span>
+  )
+}
+
+function ProjectCredit({ compact = false }) {
+  return (
+    <aside className={`project-credit ${compact ? 'is-compact' : ''}`} aria-label="About Change Cards">
+      <span className="credit-maker"><span className="credit-prefix">A small experiment by </span><a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas</a></span>
+      <i className="credit-separator" aria-hidden="true">·</i>
+      <span className="credit-context">Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
+    </aside>
   )
 }
 
@@ -348,7 +354,10 @@ function TopBar({ onRestart, savedCards, onOpenSaved }) {
           </nav>
         )}
       </div>
-      <button className="text-button" onClick={onRestart}>New idea ↗</button>
+      <div className="topbar-meta">
+        <ProjectCredit compact />
+        <button className="text-button" onClick={onRestart}>New idea ↗</button>
+      </div>
     </header>
   )
 }
