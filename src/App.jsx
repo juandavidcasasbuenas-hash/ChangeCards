@@ -1270,7 +1270,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
           <p>{card.provocation}</p>
         </div>
         <label className="sr-only" htmlFor={`response-${card.id}`}>Write the next version of your idea</label>
-        <div className={`response-editor-shell ${sparkState?.loading ? 'is-catching' : ''}`}>
+        <div className={`response-editor-shell ${draft ? 'has-writing' : 'is-empty'} ${sparkState?.loading ? 'is-catching' : ''}`}>
           <textarea
             id={`response-${card.id}`}
             ref={editorRef}
@@ -1284,7 +1284,7 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, initi
                 saveDraft()
               }
             }}
-            placeholder="Start rough. One changed detail is enough…"
+            placeholder="Type here — one changed detail is enough…"
           />
           <span className="spark-dust" aria-hidden="true">
             {Array.from({ length: 9 }, (_, index) => <i key={index}>✦</i>)}

@@ -730,9 +730,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .response-workbench { display: flex; flex-direction: column; gap: 18px; min-height: 0; padding: 0 3px 8px 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
 .provocation-copy { border: 0; padding: 5px 24px 4px 0; }
 .provocation-copy p { margin: 0; font: 700 clamp(25px, 2.1vw, 32px)/1.03 var(--display-font); letter-spacing: -.015em; }
-.response-editor-shell { position: relative; min-height: 230px; overflow: hidden; border-bottom: 2px solid var(--ink); background: transparent; transition: border-color 180ms ease, background 180ms ease; }
-.response-editor-shell:focus-within { border-color: var(--card-color); background: rgba(255,255,255,.34); }
-.response-editor { position: relative; z-index: 1; display: block; width: 100%; min-height: 230px; resize: none; border: 0; padding: 17px 4px 92px; background: transparent; box-shadow: none; font: 500 17px/1.42 'DM Sans'; }
+.response-editor-shell { position: relative; min-height: 230px; overflow: hidden; border-bottom: 1px solid rgba(23,23,19,.2); background: transparent; cursor: text; transition: border-color 180ms ease, background 180ms ease; }
+.response-editor-shell:focus-within { border-color: color-mix(in srgb, var(--card-color) 58%, transparent); background: rgba(255,255,255,.34); }
+.response-editor-shell.is-empty:not(:focus-within)::after { content: ''; pointer-events: none; position: absolute; z-index: 2; top: 19px; left: 5px; width: 1.5px; height: 1.25em; background: rgba(23,23,19,.62); animation: writingCaret 1.05s steps(1, end) infinite; }
+.response-editor { position: relative; z-index: 1; display: block; width: 100%; min-height: 230px; resize: none; border: 0; padding: 17px 4px 92px 15px; background: transparent; box-shadow: none; font: 500 17px/1.42 'DM Sans'; }
 .response-editor:focus { border-color: transparent; background: transparent; box-shadow: none; outline: 0; }
 .response-editor::placeholder { color: rgba(23,23,19,.32); }
 .response-editor-shell .spark-dust { z-index: 2; inset: auto 0 0; height: 58px; }
@@ -744,6 +745,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .editor-spark button.is-taken { text-decoration: underline; text-decoration-color: var(--spark-ink); text-underline-offset: 4px; }
 .editor-spark-loading { color: rgba(23,23,19,.42); font: italic 700 14px/1.2 var(--display-font); }
 .editor-spark-loading i { display: inline-block; margin-right: 7px; color: var(--spark-ink); font-style: normal; animation: sparkTwinkle 1.2s ease-in-out infinite; }
+@keyframes writingCaret { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0; } }
 .spark-cloud { display: grid; place-items: center; min-height: 82px; padding: 0 8px; overflow: visible; }
 .spark-cloud::before, .spark-cloud::after { display: none; }
 .spark-dust { position: absolute; z-index: 0; inset: 0; pointer-events: none; color: var(--spark-ink); }
@@ -1149,7 +1151,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .active-card-wrap .provocation-copy { padding: 4px 30px 1px 0; }
   .active-card-wrap .provocation-copy p { font-size: clamp(21px, 6.3vw, 27px); line-height: 1.02; }
   .active-card-wrap .response-editor-shell { min-height: clamp(136px, 24dvh, 210px); }
-  .active-card-wrap .response-editor { min-height: clamp(136px, 24dvh, 210px); padding: 13px 4px 102px; font-size: 16px; line-height: 1.38; touch-action: pan-y; }
+  .active-card-wrap .response-editor { min-height: clamp(136px, 24dvh, 210px); padding: 13px 4px 102px 15px; font-size: 16px; line-height: 1.38; touch-action: pan-y; }
+  .active-card-wrap .response-editor-shell.is-empty:not(:focus-within)::after { top: 15px; }
   .active-card-wrap .editor-spark { min-height: 88px; padding: 12px 5px 12px; }
   .active-card-wrap .editor-spark button { min-height: 42px; padding: 8px 6px 7px 2px; font-size: clamp(13px, 3.7vw, 16px); line-height: 1.18; white-space: normal; touch-action: manipulation; }
   .active-card-wrap .spark-cloud { min-height: 86px; }
