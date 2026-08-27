@@ -214,6 +214,7 @@ function App() {
     <main className="app-shell mode-tabletop">
       <TopBar onRestart={startAgain} savedCards={savedCards} onOpenSaved={setActiveCardId} />
       <Tabletop session={session} update={update} activeId={activeCardId} setActiveId={setActiveCardId} />
+      <ProjectCredit compact appFooter hidden={Boolean(activeCardId)} />
     </main>
   )
 }
@@ -318,9 +319,9 @@ function Logo() {
   )
 }
 
-function ProjectCredit({ compact = false }) {
+function ProjectCredit({ compact = false, appFooter = false, hidden = false }) {
   return (
-    <aside className={`project-credit ${compact ? 'is-compact' : ''}`} aria-label="About Change Cards">
+    <aside className={`project-credit ${compact ? 'is-compact' : ''} ${appFooter ? 'is-app-footer' : ''} ${hidden ? 'is-hidden' : ''}`} aria-label="About Change Cards">
       <span className="credit-maker"><span className="credit-prefix">A small experiment by </span><a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas</a></span>
       <i className="credit-separator" aria-hidden="true">·</i>
       <span className="credit-context">Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
@@ -333,7 +334,6 @@ function TopBar({ onRestart, savedCards, onOpenSaved }) {
     <header className="topbar">
       <div className="topbar-workshop">
         <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
-        <ProjectCredit compact />
         {savedCards.length > 0 && (
           <nav className="saved-pins" aria-label={`${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}>
             <span className="saved-pins-label">Saved</span>

@@ -286,6 +286,24 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .project-credit.is-compact { flex: 0 0 auto; justify-self: auto; gap: 7px; color: rgba(23,23,19,.56); font-size: 10px; white-space: nowrap; }
 .project-credit.is-compact .credit-prefix { font-size: 0; }
 .project-credit.is-compact .credit-prefix::before { content: 'By '; font-size: 10px; }
+.project-credit.is-app-footer {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  bottom: max(6px, env(safe-area-inset-bottom));
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  padding: 3px 8px;
+  opacity: .58;
+  filter: drop-shadow(0 1px 0 rgba(250,247,237,.8));
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+.project-credit.is-app-footer a { pointer-events: auto; }
+.project-credit.is-app-footer:focus-within,
+.project-credit.is-app-footer:hover { opacity: .92; }
+.project-credit.is-app-footer.is-hidden { opacity: 0; visibility: hidden; }
 .logo-button { flex: 0 0 auto; }
 .saved-pins { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .saved-pins-label, .saved-pins-count { color: var(--muted); font: 500 7px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
