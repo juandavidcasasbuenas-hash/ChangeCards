@@ -132,6 +132,7 @@ const DEFAULT_SESSION = {
   swarm: {},
   dealtCardIds: [],
   cardPositions: {},
+  scrapbookOrder: [],
 }
 
 function loadSession() {
@@ -223,8 +224,10 @@ function formatAllSavedIdeas(originalIdea, notes) {
 function App() {
   const [session, setSession] = useState(loadSession)
   const [activeCard, setActiveCard] = useState(null)
+  const [scrapbookOpen, setScrapbookOpen] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState({ key: null, message: '' })
   const activeTriggerRef = useRef(null)
+  const scrapbookTriggerRef = useRef(null)
   const copyTimerRef = useRef(null)
 
   useEffect(() => {
@@ -238,6 +241,7 @@ function App() {
   const startAgain = () => {
     const next = { ...DEFAULT_SESSION }
     setActiveCard(null)
+    setScrapbookOpen(false)
     setSession(next)
     sessionStorage.removeItem('change-cards-cache-v1')
   }
@@ -250,6 +254,16 @@ function App() {
   const closeCard = () => {
     setActiveCard(null)
     window.setTimeout(() => activeTriggerRef.current?.focus?.({ preventScroll: true }), 0)
+  }
+
+  const openScrapbook = (trigger) => {
+    scrapbookTriggerRef.current = trigger instanceof HTMLElement ? trigger : document.activeElement
+    setScrapbookOpen(true)
+  }
+
+  const closeScrapbook = () => {
+    setScrapbookOpen(false)
+    window.setTimeout(() => scrapbookTriggerRef.current?.focus?.({ preventScroll: true }), 0)
   }
 
   const copyWithFeedback = async (key, value, successMessage) => {
@@ -268,9 +282,29 @@ function App() {
     return <Entry session={session} update={update} />
   }
 
+  const scrapbookOrder = session.scrapbookOrder || []
+  const scrapbookOrderIndex = new Map(scrapbookOrder.map((cardId, index) => [cardId, index]))
   const savedCards = CARDS
     .filter((card) => session.swarm?.[card.id]?.visited)
-    .sort((a, b) => (session.swarm[b.id]?.updatedAt || 0) - (session.swarm[a.id]?.updatedAt || 0))
+    .sort((a, b) => {
+      const aIndex = scrapbookOrderIndex.get(a.id)
+      const bIndex = scrapbookOrderIndex.get(b.id)
+      if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex
+      if (aIndex !== undefined) return -1
+      if (bIndex !== undefined) return 1
+      return (session.swarm[b.id]?.updatedAt || 0) - (session.swarm[a.id]?.updatedAt || 0)
+    })
+
+  const reorderScrapbookCard = (cardId, targetId) => {
+    if (cardId === targetId) return
+    const order = savedCards.map((card) => card.id)
+    const fromIndex = order.indexOf(cardId)
+    const targetIndex = order.indexOf(targetId)
+    if (fromIndex < 0 || targetIndex < 0) return
+    const [moved] = order.splice(fromIndex, 1)
+    order.splice(targetIndex, 0, moved)
+    update({ scrapbookOrder: order })
+  }
 
   return (
     <main className="app-shell mode-tabletop">
@@ -278,9 +312,21 @@ function App() {
         onRestart={startAgain}
         savedCards={savedCards}
         onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+        onOpenScrapbook={openScrapbook}
         onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
         copied={copyFeedback.key === 'all'}
       />
+      {scrapbookOpen && (
+        <Scrapbook
+          idea={session.idea}
+          cards={savedCards}
+          notes={session.swarm}
+          obscured={Boolean(activeCard)}
+          onClose={closeScrapbook}
+          onOpenCard={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+          onReorder={reorderScrapbookCard}
+        />
+      )}
       <Tabletop
         session={session}
         update={update}
@@ -293,7 +339,7 @@ function App() {
         onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
       />
       <span className="sr-only" role="status" aria-live="polite">{copyFeedback.message}</span>
-      <ProjectCredit compact appFooter hidden={Boolean(activeCard)} />
+      <ProjectCredit compact appFooter hidden={Boolean(activeCard) || scrapbookOpen} />
     </main>
   )
 }
@@ -341,6 +387,7 @@ function Entry({ session, update }) {
       dealtCardIds: [],
       cardPositions: {},
       swarm: {},
+      scrapbookOrder: [],
     })
   }
 
@@ -416,7 +463,40 @@ function CopyIcon({ copied = false }) {
   )
 }
 
-function TopBar({ onRestart, savedCards, onOpenSaved, onCopyAll, copied }) {
+function ScrapbookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.5 5.5h6.2c.8 0 1.3.25 1.3.75v12.2c0-.8-.65-1.2-1.7-1.2H4.5z" />
+      <path d="M19.5 5.5h-6.2c-.8 0-1.3.25-1.3.75v12.2c0-.8.65-1.2 1.7-1.2h5.8z" />
+      <path d="M7 9h2.5M14.5 9H17M7 12h2.5M14.5 12H17" />
+    </svg>
+  )
+}
+
+function TopBar({ onRestart, savedCards, onOpenSaved, onOpenScrapbook, onCopyAll, copied }) {
+  const [showScrapbookTip, setShowScrapbookTip] = useState(() => {
+    try {
+      return window.matchMedia(COMPACT_TABLE_QUERY).matches && localStorage.getItem('change-cards-scrapbook-tip-v1') !== 'seen'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    if (!showScrapbookTip || !savedCards.length) return undefined
+    const timer = window.setTimeout(() => {
+      setShowScrapbookTip(false)
+      try { localStorage.setItem('change-cards-scrapbook-tip-v1', 'seen') } catch { /* the cue can safely repeat */ }
+    }, 5200)
+    return () => window.clearTimeout(timer)
+  }, [showScrapbookTip, savedCards.length])
+
+  const openScrapbook = (event) => {
+    setShowScrapbookTip(false)
+    try { localStorage.setItem('change-cards-scrapbook-tip-v1', 'seen') } catch { /* the cue can safely repeat */ }
+    onOpenScrapbook(event.currentTarget)
+  }
+
   return (
     <header className="topbar">
       <div className="topbar-workshop">
@@ -445,14 +525,199 @@ function TopBar({ onRestart, savedCards, onOpenSaved, onCopyAll, copied }) {
           </nav>
         )}
       </div>
-      <button className="text-button" onClick={onRestart}>New idea ↗</button>
+      <div className="topbar-actions">
+        {savedCards.length > 0 && (
+          <div className="scrapbook-nav-entry">
+            <button
+              className="text-button scrapbook-nav-button"
+              type="button"
+              onClick={openScrapbook}
+              aria-label={`Open scrapbook with ${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}
+            >
+              <ScrapbookIcon />
+              <span>Scrapbook</span>
+            </button>
+            {showScrapbookTip && <span className="scrapbook-nav-tip" role="status">Scrapbook</span>}
+          </div>
+        )}
+        <button className="text-button new-idea-button" onClick={onRestart}>New idea ↗</button>
+      </div>
     </header>
   )
 }
 
-function OriginalNote({ idea, compact = false }) {
+function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorder }) {
+  const dialogRef = useRef(null)
+  const closeRef = useRef(null)
+  const pointerDragRef = useRef(null)
+  const [draggingId, setDraggingId] = useState(null)
+  const [dropTargetId, setDropTargetId] = useState(null)
+  const [reorderMessage, setReorderMessage] = useState('')
+
+  const resetDrag = () => {
+    pointerDragRef.current = null
+    setDraggingId(null)
+    setDropTargetId(null)
+  }
+
+  const moveCard = (cardId, targetId) => {
+    if (!cardId || !targetId || cardId === targetId) return
+    const card = cards.find((item) => item.id === cardId)
+    const targetIndex = cards.findIndex((item) => item.id === targetId)
+    onReorder(cardId, targetId)
+    setReorderMessage(`${card?.title || 'Card'} moved to position ${targetIndex + 1}.`)
+  }
+
+  const startPointerDrag = (event, cardId) => {
+    if (event.pointerType === 'mouse') return
+    event.preventDefault()
+    event.stopPropagation()
+    pointerDragRef.current = { cardId, pointerId: event.pointerId, targetId: null }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setDraggingId(cardId)
+  }
+
+  const updatePointerDrag = (event) => {
+    const drag = pointerDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const target = document.elementsFromPoint(event.clientX, event.clientY)
+      .map((element) => element.closest?.('.scrapbook-card-shell'))
+      .find((element) => element && Number(element.dataset.cardId) !== drag.cardId)
+    const targetId = target ? Number(target.dataset.cardId) : null
+    drag.targetId = targetId
+    setDropTargetId(targetId)
+  }
+
+  const finishPointerDrag = (event) => {
+    const drag = pointerDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    moveCard(drag.cardId, drag.targetId)
+    resetDrag()
+  }
+
+  const moveWithKeyboard = (event, cardId, index) => {
+    const previous = event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+    if (!previous && !next) return
+    const target = cards[index + (previous ? -1 : 1)]
+    if (!target) return
+    event.preventDefault()
+    moveCard(cardId, target.id)
+  }
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [])
+
+  useEffect(() => {
+    const focusTimer = window.setTimeout(() => closeRef.current?.focus({ preventScroll: true }), 280)
+    return () => window.clearTimeout(focusTimer)
+  }, [])
+
+  useEffect(() => {
+    if (obscured) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = [...(dialogRef.current?.querySelectorAll('button:not(:disabled), [href], [tabindex]:not([tabindex="-1"])') || [])]
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [obscured, onClose])
+
   return (
-    <aside className={`original-note ${compact ? 'compact' : ''}`}>
+    <section ref={dialogRef} className={`scrapbook-layer ${obscured ? 'is-obscured' : ''}`} role="dialog" aria-modal="true" aria-labelledby="scrapbook-title">
+      <header className="scrapbook-header">
+        <h1 id="scrapbook-title" className="sr-only">Scrapbook</h1>
+        <OriginalNote idea={idea} compact scrapbook />
+        <button ref={closeRef} className="scrapbook-close" type="button" onClick={onClose} aria-label="Close scrapbook">×</button>
+      </header>
+      <div className="scrapbook-scroll">
+        <div className="scrapbook-spread">
+          <span id="scrapbook-reorder-instructions" className="sr-only">Use the move button to drag a card, or focus it and use the arrow keys.</span>
+          {cards.map((card, index) => (
+            <article
+              key={card.id}
+              data-card-id={card.id}
+              className={`scrapbook-card-shell category-${card.category} ${draggingId === card.id ? 'is-dragging' : ''} ${dropTargetId === card.id ? 'is-drop-target' : ''}`}
+              style={{ '--scrapbook-tilt': `${CARD_TILTS[card.id - 1] * .55}deg`, '--scrapbook-delay': `${Math.min(index, 8) * 55}ms` }}
+              onDragEnter={() => { if (draggingId && draggingId !== card.id) setDropTargetId(card.id) }}
+              onDragOver={(event) => { if (draggingId && draggingId !== card.id) event.preventDefault() }}
+              onDrop={(event) => {
+                event.preventDefault()
+                const sourceId = Number(event.dataTransfer.getData('text/plain')) || draggingId
+                moveCard(sourceId, card.id)
+                resetDrag()
+              }}
+            >
+              <button
+                type="button"
+                className="scrapbook-card"
+                onClick={(event) => onOpenCard(card.id, event.currentTarget)}
+                aria-label={`Review ${card.title}`}
+              >
+                <span className="scrapbook-card-category">{card.label}</span>
+                <CardIcon id={card.id} />
+                <strong>{card.title}</strong>
+                <span className="scrapbook-card-question">{card.provocation}</span>
+                <span className="scrapbook-card-response">{notes[card.id]?.note}</span>
+              </button>
+              <button
+                type="button"
+                className="scrapbook-drag-grip"
+                draggable="true"
+                aria-label={`Move ${card.title}. Use the arrow keys to change its position.`}
+                aria-describedby="scrapbook-reorder-instructions"
+                onDragStart={(event) => {
+                  event.stopPropagation()
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', String(card.id))
+                  setDraggingId(card.id)
+                }}
+                onDragEnd={resetDrag}
+                onPointerDown={(event) => startPointerDrag(event, card.id)}
+                onPointerMove={updatePointerDrag}
+                onPointerUp={finishPointerDrag}
+                onPointerCancel={resetDrag}
+                onKeyDown={(event) => moveWithKeyboard(event, card.id, index)}
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <circle cx="6" cy="5" r="1" /><circle cx="14" cy="5" r="1" />
+                  <circle cx="6" cy="10" r="1" /><circle cx="14" cy="10" r="1" />
+                  <circle cx="6" cy="15" r="1" /><circle cx="14" cy="15" r="1" />
+                </svg>
+              </button>
+            </article>
+          ))}
+        </div>
+      </div>
+      <span className="sr-only" role="status" aria-live="polite">{reorderMessage}</span>
+    </section>
+  )
+}
+
+function OriginalNote({ idea, compact = false, scrapbook = false }) {
+  return (
+    <aside className={`original-note ${compact ? 'compact' : ''} ${scrapbook ? 'scrapbook-origin' : ''}`}>
       <p>{idea}</p>
       <i aria-hidden="true" />
     </aside>

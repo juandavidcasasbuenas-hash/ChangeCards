@@ -42,6 +42,7 @@ try {
   await page.goto(origin, { waitUntil: 'networkidle0' })
   await page.evaluate(({ originalIdea, notes }) => {
     localStorage.setItem('change-cards-onboarding-v2', 'complete')
+    localStorage.removeItem('change-cards-scrapbook-tip-v1')
     localStorage.setItem('change-cards-session-v1', JSON.stringify({
       stage: 'play',
       idea: originalIdea,
@@ -65,8 +66,62 @@ try {
   if (!rail.text.includes('COPY IDEAS') || rail.text.includes('SAVED') || rail.pinCount !== 3) {
     throw new Error(`Saved rail is not the single review/export surface: ${JSON.stringify(rail)}`)
   }
+  const topbarActions = await page.$eval('.topbar-actions', (element) => ({
+    labels: [...element.querySelectorAll('button')].map((button) => button.innerText.trim()),
+    scrapbookMovedFromRail: !document.querySelector('.saved-pins .scrapbook-nav-button'),
+  }))
+  if (topbarActions.labels[0] !== 'SCRAPBOOK' || topbarActions.labels[1] !== 'NEW IDEA ↗' || !topbarActions.scrapbookMovedFromRail) {
+    throw new Error(`Scrapbook is not beside New idea: ${JSON.stringify(topbarActions)}`)
+  }
   const usedCardLabels = await page.$$eval('.used-card-back', (cards) => cards.map((card) => card.innerText))
   if (usedCardLabels.some((label) => label.includes('Note saved'))) throw new Error('Used cards still repeat “Note saved”')
+
+  await page.click('.scrapbook-nav-button')
+  await page.waitForSelector('.scrapbook-layer')
+  await new Promise((resolve) => setTimeout(resolve, 450))
+  const scrapbook = await page.$eval('.scrapbook-layer', (element) => {
+    const rect = element.getBoundingClientRect()
+    const scroll = element.querySelector('.scrapbook-scroll')
+    const cards = [...element.querySelectorAll('.scrapbook-card')]
+    const cardHeights = cards.map((card) => Math.round(card.getBoundingClientRect().height))
+    const hierarchy = cards.every((card) => {
+      const questionSize = parseFloat(getComputedStyle(card.querySelector('.scrapbook-card-question')).fontSize)
+      const responseSize = parseFloat(getComputedStyle(card.querySelector('.scrapbook-card-response')).fontSize)
+      return responseSize > questionSize
+    })
+    const tapePositions = cards.map((card) => getComputedStyle(card.closest('.scrapbook-card-shell'), '::after').left)
+    const origin = element.querySelector('.scrapbook-origin')
+    const originTop = origin.getBoundingClientRect().top
+    scroll.scrollTop = Math.min(180, scroll.scrollHeight - scroll.clientHeight)
+    const originPinned = Math.abs(origin.getBoundingClientRect().top - originTop) < 1
+    scroll.scrollTop = 0
+    return {
+      title: element.querySelector('h1')?.textContent,
+      visibleTitleRemoved: element.querySelector('h1')?.classList.contains('sr-only'),
+      originalIdea: origin?.innerText.trim(),
+      originalIdeaPinned: originPinned,
+      cardCount: cards.length,
+      withinViewport: rect.top === 0 && rect.left === 0 && rect.right === innerWidth && rect.bottom === innerHeight,
+      noHorizontalOverflow: scroll.scrollWidth <= scroll.clientWidth + 1,
+      ideasVisible: cards.every((card) => Boolean(card.querySelector('.scrapbook-card-response')?.textContent.trim())),
+      authoredIdeasLead: hierarchy,
+      contentAwareHeights: Math.max(...cardHeights) - Math.min(...cardHeights) > 20,
+      physicalVariation: new Set(tapePositions).size > 1,
+      moveControls: element.querySelectorAll('.scrapbook-drag-grip').length,
+    }
+  })
+  if (scrapbook.title !== 'Scrapbook' || !scrapbook.visibleTitleRemoved || scrapbook.originalIdea !== originalIdea || !scrapbook.originalIdeaPinned || scrapbook.cardCount !== 3 || !scrapbook.withinViewport || !scrapbook.noHorizontalOverflow || !scrapbook.ideasVisible || !scrapbook.authoredIdeasLead || !scrapbook.contentAwareHeights || !scrapbook.physicalVariation || scrapbook.moveControls !== 3) {
+    throw new Error(`Scrapbook did not render the saved rail cleanly: ${JSON.stringify(scrapbook)}`)
+  }
+  await page.click('.scrapbook-card')
+  await page.waitForSelector('.saved-review-card[data-card-id="14"]')
+  if (sparkRequestCount !== 0) throw new Error('Opening a scrapbook card requested sparks')
+  await page.click('.saved-review-close')
+  await page.waitForSelector('.saved-review', { hidden: true })
+  await page.waitForFunction(() => document.activeElement?.classList.contains('scrapbook-card'), { timeout: 1000 })
+  await page.click('.scrapbook-close')
+  await page.waitForSelector('.scrapbook-layer', { hidden: true })
+  await page.waitForFunction(() => document.activeElement?.classList.contains('scrapbook-nav-button'), { timeout: 1000 })
 
   await page.click('.saved-pin:first-child')
   await page.waitForSelector('.saved-review-card[data-card-id="14"]')
@@ -129,6 +184,19 @@ try {
   await page.click('.surface-close')
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
+  await page.evaluate(() => localStorage.removeItem('change-cards-scrapbook-tip-v1'))
+  await page.reload({ waitUntil: 'networkidle0' })
+  await page.waitForSelector('.scrapbook-nav-tip', { visible: true })
+  const mobileScrapbookCue = await page.$eval('.scrapbook-nav-entry', (element) => {
+    const button = element.querySelector('.scrapbook-nav-button').getBoundingClientRect()
+    return {
+      text: element.querySelector('.scrapbook-nav-tip')?.textContent,
+      accessibleTarget: button.width >= 42 && button.height >= 42,
+    }
+  })
+  if (mobileScrapbookCue.text !== 'Scrapbook' || !mobileScrapbookCue.accessibleTarget) {
+    throw new Error(`Mobile scrapbook cue is not useful: ${JSON.stringify(mobileScrapbookCue)}`)
+  }
   await page.click('.saved-pin:first-child')
   await page.waitForSelector('.saved-review-card[data-card-id="14"]')
   await new Promise((resolve) => setTimeout(resolve, 650))
@@ -159,6 +227,43 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForSelector('.saved-review', { hidden: true })
 
+  await page.click('.scrapbook-nav-button')
+  await page.waitForSelector('.scrapbook-layer')
+  await new Promise((resolve) => setTimeout(resolve, 450))
+  const mobileScrapbook = await page.$eval('.scrapbook-layer', (element) => {
+    const scroll = element.querySelector('.scrapbook-scroll')
+    const cards = [...element.querySelectorAll('.scrapbook-card')]
+    const origin = element.querySelector('.scrapbook-origin')
+    const originRect = origin.getBoundingClientRect()
+    return {
+      scrollable: scroll.scrollHeight > scroll.clientHeight,
+      noHorizontalOverflow: scroll.scrollWidth <= scroll.clientWidth + 1,
+      originalIdeaVisible: origin.innerText.trim().length > 0 && originRect.left >= 0 && originRect.right <= innerWidth,
+      cardCount: cards.length,
+      cardsContained: cards.every((card) => {
+        const rect = card.getBoundingClientRect()
+        return rect.left >= 0 && rect.right <= innerWidth
+      }),
+    }
+  })
+  if (!mobileScrapbook.scrollable || !mobileScrapbook.noHorizontalOverflow || !mobileScrapbook.originalIdeaVisible || mobileScrapbook.cardCount !== 3 || !mobileScrapbook.cardsContained) {
+    throw new Error(`Mobile scrapbook is not browsable: ${JSON.stringify(mobileScrapbook)}`)
+  }
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.scrapbook-layer', { hidden: true })
+
+  await page.click('.scrapbook-nav-button')
+  await page.waitForSelector('.scrapbook-layer')
+  await page.click('.scrapbook-card-shell:first-of-type .scrapbook-drag-grip')
+  await page.keyboard.press('ArrowDown')
+  await page.waitForFunction(() => document.querySelector('.scrapbook-card-shell')?.dataset.cardId === '7')
+  await page.click('.scrapbook-close')
+  await page.reload({ waitUntil: 'networkidle0' })
+  const persistedScrapbookOrder = await page.$eval('.saved-pin:first-of-type', (element) => element.getAttribute('aria-label'))
+  if (!persistedScrapbookOrder?.includes('Make It Ridiculously Small')) {
+    throw new Error(`Scrapbook order did not persist: ${persistedScrapbookOrder}`)
+  }
+
   if (consoleErrors.length) throw new Error(`Browser errors: ${consoleErrors.join(' | ')}`)
   console.log(JSON.stringify({
     savedRailIsExportSurface: true,
@@ -166,6 +271,10 @@ try {
     individualCopy: true,
     completeCopy: true,
     chronologicalExport: true,
+    scrapbookDesktop: true,
+    scrapbookMobile: true,
+    scrapbookReordering: true,
+    mobileScrapbookCue: true,
     focusRestored: true,
     editPreservesResponse: true,
     keyboardNavigation: true,
