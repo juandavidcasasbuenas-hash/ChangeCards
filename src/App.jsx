@@ -1405,7 +1405,6 @@ function SavedIdeaViewer({ card, note, index, count, previousCard, nextCard, cop
           <p>{card.provocation}</p>
         </div>
         <div className="saved-review-idea">
-          <span>Your idea</span>
           <p>{note}</p>
         </div>
         <footer className="saved-review-actions">

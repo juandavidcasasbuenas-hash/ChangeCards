@@ -629,11 +629,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .saved-review-heading .card-icon { grid-column: 2; grid-row: 1 / span 2; width: clamp(66px, 8vw, 88px); height: clamp(66px, 8vw, 88px); }
 .saved-review-heading h2 { align-self: end; max-width: 10ch; margin: 0; font: 600 clamp(31px, 4vw, 47px)/.9 'DM Sans'; letter-spacing: -.06em; text-transform: uppercase; text-wrap: balance; }
 .saved-review-question { padding-top: 16px; border-top: 1px solid rgba(250,247,237,.28); }
-.saved-review-question span, .saved-review-idea span { display: block; margin-bottom: 7px; color: rgba(250,247,237,.6); font: 500 8px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
+.saved-review-question span { display: block; margin-bottom: 7px; color: rgba(250,247,237,.6); font: 500 8px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
 .saved-review-question p { margin: 0; font: 700 clamp(18px, 2.4vw, 24px)/1.08 var(--display-font); text-wrap: pretty; }
-.saved-review-idea { min-height: 0; padding: 15px 16px 18px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; color: var(--ink); background: rgba(250,247,237,.92); box-shadow: inset 3px 3px 0 rgba(23,23,19,.08); scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
-.saved-review-idea span { color: rgba(23,23,19,.5); }
-.saved-review-idea p { margin: 0; overflow-wrap: anywhere; font: 500 clamp(16px, 2vw, 19px)/1.42 'DM Sans'; white-space: pre-wrap; }
+.saved-review-idea { min-height: 0; padding: 1px 8px 1px 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; color: rgba(250,247,237,.9); background: transparent; scrollbar-color: rgba(250,247,237,.42) transparent; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.saved-review-idea p { margin: 0; overflow-wrap: anywhere; font: 500 clamp(17px, 2vw, 20px)/1.42 'DM Sans'; white-space: pre-wrap; }
 .saved-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .saved-review-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid rgba(250,247,237,.7); padding: 10px 14px; color: var(--paper-light); background: transparent; font: 500 10px/1 'DM Mono'; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: color 160ms ease, background 160ms ease, transform 160ms ease; }
 .saved-review-actions button:hover, .saved-review-actions button:focus-visible { color: var(--ink); background: var(--paper-light); transform: translateY(-2px); }
@@ -1231,8 +1230,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .saved-review-heading h2 { font-size: clamp(28px, 9vw, 39px); }
   .saved-review-question { padding-top: 12px; }
   .saved-review-question p { font-size: clamp(17px, 5.3vw, 22px); }
-  .saved-review-idea { padding: 13px 14px 16px; }
-  .saved-review-idea p { font-size: clamp(15px, 4.2vw, 18px); line-height: 1.4; }
+  .saved-review-idea { padding: 1px 6px 1px 0; }
+  .saved-review-idea p { font-size: clamp(16px, 4.4vw, 19px); line-height: 1.4; }
   .saved-review-actions button { flex: 1; min-height: 46px; padding: 10px 8px; font-size: 9px; touch-action: manipulation; }
   .saved-review-close { top: 7px; right: 7px; touch-action: manipulation; }
   .saved-review-navigation { grid-template-columns: 44px auto 44px; gap: 12px; }
