@@ -10,9 +10,11 @@
     "build": "vite build",
     "start": "node server.mjs",
     "verify": "node scripts/verify.mjs",
+    "verify:coop-routing": "node scripts/verify-coop-routing.mjs",
     "verify:saved": "node scripts/verify-saved.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
     "charter-webfont": "^4.1.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",

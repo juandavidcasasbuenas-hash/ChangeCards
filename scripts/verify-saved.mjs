@@ -63,14 +63,14 @@ try {
     text: element.innerText,
     pinCount: element.querySelectorAll('.saved-pin').length,
   }))
-  if (!rail.text.includes('COPY IDEAS') || rail.text.includes('SAVED') || rail.pinCount !== 3) {
+  if (!rail.text.includes('Copy ideas') || rail.text.includes('Saved') || rail.pinCount !== 3) {
     throw new Error(`Saved rail is not the single review/export surface: ${JSON.stringify(rail)}`)
   }
   const topbarActions = await page.$eval('.topbar-actions', (element) => ({
     labels: [...element.querySelectorAll('button')].map((button) => button.innerText.trim()),
     scrapbookMovedFromRail: !document.querySelector('.saved-pins .scrapbook-nav-button'),
   }))
-  if (topbarActions.labels[0] !== 'SCRAPBOOK' || topbarActions.labels[1] !== 'NEW IDEA ↗' || !topbarActions.scrapbookMovedFromRail) {
+  if (topbarActions.labels[0] !== 'Scrapbook' || topbarActions.labels[1] !== 'New idea' || !topbarActions.scrapbookMovedFromRail) {
     throw new Error(`Scrapbook is not beside New idea: ${JSON.stringify(topbarActions)}`)
   }
   const usedCardLabels = await page.$$eval('.used-card-back', (cards) => cards.map((card) => card.innerText))
@@ -98,7 +98,8 @@ try {
     return {
       title: element.querySelector('h1')?.textContent,
       visibleTitleRemoved: element.querySelector('h1')?.classList.contains('sr-only'),
-      originalIdea: origin?.innerText.trim(),
+      originalLabel: origin?.querySelector('span')?.textContent.trim(),
+      originalIdea: origin?.querySelector('p')?.textContent.trim(),
       originalIdeaPinned: originPinned,
       cardCount: cards.length,
       withinViewport: rect.top === 0 && rect.left === 0 && rect.right === innerWidth && rect.bottom === innerHeight,
@@ -110,7 +111,7 @@ try {
       moveControls: element.querySelectorAll('.scrapbook-drag-grip').length,
     }
   })
-  if (scrapbook.title !== 'Scrapbook' || !scrapbook.visibleTitleRemoved || scrapbook.originalIdea !== originalIdea || !scrapbook.originalIdeaPinned || scrapbook.cardCount !== 3 || !scrapbook.withinViewport || !scrapbook.noHorizontalOverflow || !scrapbook.ideasVisible || !scrapbook.authoredIdeasLead || !scrapbook.contentAwareHeights || !scrapbook.physicalVariation || scrapbook.moveControls !== 3) {
+  if (scrapbook.title !== 'Scrapbook' || !scrapbook.visibleTitleRemoved || scrapbook.originalLabel !== 'Starting idea' || scrapbook.originalIdea !== originalIdea || !scrapbook.originalIdeaPinned || scrapbook.cardCount !== 3 || !scrapbook.withinViewport || !scrapbook.noHorizontalOverflow || !scrapbook.ideasVisible || !scrapbook.authoredIdeasLead || !scrapbook.contentAwareHeights || !scrapbook.physicalVariation || scrapbook.moveControls !== 3) {
     throw new Error(`Scrapbook did not render the saved rail cleanly: ${JSON.stringify(scrapbook)}`)
   }
   await page.click('.scrapbook-card')

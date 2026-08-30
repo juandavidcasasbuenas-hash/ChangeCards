@@ -49,6 +49,35 @@ try {
   if (!landing.text.includes('Push an idea') || !landing.text.includes('What are you working on?')) throw new Error('Landing page content is missing')
   if (!landing.favicon || landing.creatorLink !== 'https://jdcasasbuenas.com') throw new Error('Landing page identity metadata is missing')
 
+  const initialMode = await page.$eval('.entry-mode-toggle', (element) => ({
+    text: element.innerText,
+    selected: element.querySelector('[aria-pressed="true"]')?.textContent?.trim(),
+  }))
+  if (!initialMode.text.toLowerCase().includes('solo') || !initialMode.text.toLowerCase().includes('co-op') || initialMode.selected !== 'Solo') throw new Error('The mode selector is not initialised to Solo')
+  await page.click('.entry-mode-toggle button:last-child')
+  await page.waitForSelector('.entry-room-actions #entry-room-code')
+  if (await page.$('.host-name-field')) throw new Error('The landing page should not ask for a name')
+  if (await page.$eval('.entry-mode-toggle button:last-child', (element) => element.getAttribute('aria-pressed')) !== 'true') throw new Error('The mode selector did not switch to Co-op')
+  const coopEntryOrder = await page.evaluate(() => {
+    const idea = document.querySelector('.idea-input-wrap')?.getBoundingClientRect()
+    const roomActions = document.querySelector('.entry-room-actions')?.getBoundingClientRect()
+    return { ideaBottom: idea?.bottom, roomActionsTop: roomActions?.top }
+  })
+  if (coopEntryOrder.roomActionsTop <= coopEntryOrder.ideaBottom) throw new Error('The room choice should appear below the idea')
+  await page.type('#idea', 'A temporary co-op idea')
+  await page.click('.entry-create-choice')
+  await page.waitForSelector('.entry-name-step #entry-display-name')
+  if (!await page.$eval('.entry-name-step', (element) => element.innerText.includes('What should we') && element.innerText.includes('call you?'))) throw new Error('Name entry did not move to the focused second screen')
+  await page.click('.entry-name-back')
+  await page.waitForSelector('.entry-mode-toggle')
+  await page.$eval('#idea', (element) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(element, '')
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await page.click('.entry-mode-toggle button:first-child')
+  await page.waitForSelector('.entry-room-actions', { hidden: true })
+
   const originalIdea = 'A neighbourhood library that helps isolated older residents make new friends.'
   await page.type('#idea', originalIdea)
   await page.click('.idea-form .ink-button')
