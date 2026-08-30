@@ -1108,8 +1108,8 @@ function CoopBetween({ workshop, participantCount, isHost, busy, onNext, onEnd }
       <CoopRoundTrack current={workshop.round_number + 1} target={workshop.target_rounds} />
       <div className="coop-between-pile" aria-hidden="true"><i /><i /><i /><i /></div>
       <p className="eyebrow">Pass {workshop.round_number} complete · {workshop.submitted_count} of {participantCount} responses</p>
-      <h1>Keep the folds closed.</h1>
-      <p>No peeking yet. The ideas return to their owners after pass four.</p>
+      <h1>No peeking yet</h1>
+      <p>The ideas return to their owners after pass four.</p>
       {isHost ? (
         <div className="coop-between-actions"><button className="ink-button" type="button" onClick={onNext} disabled={busy}>{busy ? 'Starting pass…' : `Start pass ${workshop.round_number + 1}`}</button><button type="button" onClick={onEnd} disabled={busy}>End session</button></div>
       ) : <p className="coop-waiting-line"><i /> Waiting for the host to start the next pass</p>}
