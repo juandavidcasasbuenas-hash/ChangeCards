@@ -453,7 +453,6 @@ function TopBar({ onRestart, savedCards, onOpenSaved, onCopyAll, copied }) {
 function OriginalNote({ idea, compact = false }) {
   return (
     <aside className={`original-note ${compact ? 'compact' : ''}`}>
-      <span>Your original idea</span>
       <p>{idea}</p>
       <i aria-hidden="true" />
     </aside>

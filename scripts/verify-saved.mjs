@@ -97,6 +97,7 @@ try {
 
   await page.click('.saved-review-close')
   await page.waitForSelector('.saved-review', { hidden: true })
+  await page.waitForFunction(() => document.activeElement?.classList.contains('saved-pin'), { timeout: 1000 })
   const focusRestored = await page.evaluate(() => document.activeElement?.classList.contains('saved-pin'))
   if (!focusRestored) throw new Error('Closing review did not restore focus to its saved thumbnail')
 
