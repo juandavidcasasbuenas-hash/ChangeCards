@@ -629,7 +629,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .saved-review-heading .card-icon { grid-column: 2; grid-row: 1 / span 2; width: clamp(66px, 8vw, 88px); height: clamp(66px, 8vw, 88px); }
 .saved-review-heading h2 { align-self: end; max-width: 10ch; margin: 0; font: 600 clamp(31px, 4vw, 47px)/.9 'DM Sans'; letter-spacing: -.06em; text-transform: uppercase; text-wrap: balance; }
 .saved-review-question { padding-top: 16px; border-top: 1px solid rgba(250,247,237,.28); }
-.saved-review-question span { display: block; margin-bottom: 7px; color: rgba(250,247,237,.6); font: 500 8px/1 'DM Mono'; letter-spacing: .07em; text-transform: uppercase; }
 .saved-review-question p { margin: 0; font: 700 clamp(18px, 2.4vw, 24px)/1.08 var(--display-font); text-wrap: pretty; }
 .saved-review-idea { min-height: 0; padding: 1px 8px 1px 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; color: rgba(250,247,237,.9); background: transparent; scrollbar-color: rgba(250,247,237,.42) transparent; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
 .saved-review-idea p { margin: 0; overflow-wrap: anywhere; font: 500 clamp(17px, 2vw, 20px)/1.42 'DM Sans'; white-space: pre-wrap; }

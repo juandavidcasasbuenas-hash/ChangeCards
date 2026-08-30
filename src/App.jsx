@@ -1401,7 +1401,6 @@ function SavedIdeaViewer({ card, note, index, count, previousCard, nextCard, cop
           <h2 id={`saved-review-title-${card.id}`}>{card.title}</h2>
         </header>
         <div className="saved-review-question">
-          <span>The question</span>
           <p>{card.provocation}</p>
         </div>
         <div className="saved-review-idea">

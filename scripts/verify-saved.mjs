@@ -79,10 +79,11 @@ try {
       withinViewport: rect.top >= 0 && rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
       noteCanScroll: note.scrollHeight >= note.clientHeight,
       noteIsContinuous: noteStyle.backgroundColor === 'rgba(0, 0, 0, 0)' && noteStyle.boxShadow === 'none' && !note.querySelector('span'),
+      questionHasNoHelper: !element.querySelector('.saved-review-question span') && !element.innerText.includes('THE QUESTION'),
       questionVisible: Boolean(element.querySelector('.saved-review-question')?.innerText.trim()),
     }
   })
-  if (!desktopReview.withinViewport || !desktopReview.noteCanScroll || !desktopReview.noteIsContinuous || !desktopReview.questionVisible) {
+  if (!desktopReview.withinViewport || !desktopReview.noteCanScroll || !desktopReview.noteIsContinuous || !desktopReview.questionHasNoHelper || !desktopReview.questionVisible) {
     throw new Error(`Desktop saved review is not contained and readable: ${JSON.stringify(desktopReview)}`)
   }
 
