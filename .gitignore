@@ -3,8 +3,10 @@ dist/
 .DS_Store
 .env
 .env.*
+!.env.example
 OpenAI.txt
 OpenAi.txt
 openAI.txt
 npm-debug.log*
 verification-*.png
+supabase/.temp/
