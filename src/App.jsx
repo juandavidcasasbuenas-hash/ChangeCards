@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import {
   closeCurrentRound,
   createWorkshop,
@@ -309,7 +310,12 @@ function App() {
   if (roomCode) return <CoopWorkshop roomCode={roomCode} onLeave={leaveRoom} />
 
   if (session.stage === 'intro' || !session.idea) {
-    return <Entry session={session} update={update} onEnterRoom={enterRoom} />
+    return (
+      <>
+        <Entry session={session} update={update} onEnterRoom={enterRoom} />
+        <Analytics />
+      </>
+    )
   }
 
   const scrapbookOrder = session.scrapbookOrder || []
@@ -337,44 +343,47 @@ function App() {
   }
 
   return (
-    <main className="app-shell mode-tabletop">
-      <TopBar
-        onRestart={startAgain}
-        savedCards={savedCards}
-        onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
-        onOpenScrapbook={openScrapbook}
-        onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
-        copied={copyFeedback.key === 'all'}
-      />
-      {scrapbookOpen && (
-        <Scrapbook
-          idea={session.idea}
-          cards={savedCards}
-          notes={session.swarm}
-          obscured={Boolean(activeCard)}
-          onClose={closeScrapbook}
-          onOpenCard={(cardId, trigger) => openCard(cardId, 'review', trigger)}
-          onReorder={reorderScrapbookCard}
+    <>
+      <main className="app-shell mode-tabletop">
+        <TopBar
+          onRestart={startAgain}
+          savedCards={savedCards}
+          onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+          onOpenScrapbook={openScrapbook}
+          onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
+          copied={copyFeedback.key === 'all'}
         />
-      )}
-      <Tabletop
-        session={session}
-        update={update}
-        activeCard={activeCard}
-        savedCards={savedCards}
-        openCard={openCard}
-        closeCard={closeCard}
-        setActiveCard={setActiveCard}
-        copyFeedback={copyFeedback}
-        onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
-      />
-      {copyFeedback.message && (
-        <div className={`feedback-toast ${copyFeedback.key === 'error' ? 'is-error' : ''}`} role={copyFeedback.key === 'error' ? 'alert' : 'status'}>
-          {copyFeedback.message}
-        </div>
-      )}
-      <ProjectCredit compact appFooter hidden={Boolean(activeCard) || scrapbookOpen} />
-    </main>
+        {scrapbookOpen && (
+          <Scrapbook
+            idea={session.idea}
+            cards={savedCards}
+            notes={session.swarm}
+            obscured={Boolean(activeCard)}
+            onClose={closeScrapbook}
+            onOpenCard={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+            onReorder={reorderScrapbookCard}
+          />
+        )}
+        <Tabletop
+          session={session}
+          update={update}
+          activeCard={activeCard}
+          savedCards={savedCards}
+          openCard={openCard}
+          closeCard={closeCard}
+          setActiveCard={setActiveCard}
+          copyFeedback={copyFeedback}
+          onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
+        />
+        {copyFeedback.message && (
+          <div className={`feedback-toast ${copyFeedback.key === 'error' ? 'is-error' : ''}`} role={copyFeedback.key === 'error' ? 'alert' : 'status'}>
+            {copyFeedback.message}
+          </div>
+        )}
+        <ProjectCredit compact appFooter hidden={Boolean(activeCard) || scrapbookOpen} />
+      </main>
+      <Analytics />
+    </>
   )
 }
 
