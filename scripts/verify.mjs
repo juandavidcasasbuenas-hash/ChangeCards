@@ -49,6 +49,22 @@ try {
   if (!landing.text.includes('Push an idea') || !landing.text.includes('What are you working on?')) throw new Error('Landing page content is missing')
   if (!landing.favicon || landing.creatorLink !== 'https://jdcasasbuenas.com') throw new Error('Landing page identity metadata is missing')
 
+  const privacyTrigger = await page.$('.project-credit .privacy-link')
+  if (!privacyTrigger) throw new Error('The footer does not expose the privacy notice')
+  await privacyTrigger.click()
+  await page.waitForSelector('.privacy-sheet')
+  const privacyNotice = await page.$eval('.privacy-sheet', (element) => ({
+    text: element.innerText,
+    inViewport: element.getBoundingClientRect().top >= 0 && element.getBoundingClientRect().bottom <= innerHeight,
+    bodyLocked: document.body.style.overflow === 'hidden',
+  }))
+  if (!privacyNotice.text.includes('How your ideas') || !privacyNotice.text.includes('Supabase') || !privacyNotice.text.includes('OpenAI') || !privacyNotice.text.includes('Vercel Web Analytics') || !privacyNotice.inViewport || !privacyNotice.bodyLocked) {
+    throw new Error(`Privacy notice is incomplete or poorly contained: ${JSON.stringify(privacyNotice)}`)
+  }
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.privacy-sheet', { hidden: true })
+  await page.waitForFunction(() => document.activeElement === document.querySelector('.project-credit .privacy-link'))
+
   const initialMode = await page.$eval('.entry-mode-toggle', (element) => ({
     text: element.innerText,
     selected: element.querySelector('[aria-pressed="true"]')?.textContent?.trim(),
@@ -165,9 +181,31 @@ try {
   })
   if (!lastCard.visible) throw new Error(`Mobile users cannot scroll to the final dealt cards: ${JSON.stringify(lastCard)}`)
 
+  await page.$eval('.project-credit.is-app-footer .privacy-link', (element) => element.click())
+  await page.waitForSelector('.privacy-sheet')
+  await new Promise((resolve) => setTimeout(resolve, 450))
+  const mobilePrivacy = await page.$eval('.privacy-sheet', (element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      left: rect.left,
+      right: rect.right,
+      bottom: rect.bottom,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      internallyScrollable: element.scrollHeight > element.clientHeight,
+      bodyHorizontalOverflow: document.body.scrollWidth > innerWidth + 1,
+    }
+  })
+  if (mobilePrivacy.left < -1 || mobilePrivacy.right > mobilePrivacy.viewportWidth + 1 || mobilePrivacy.bottom > mobilePrivacy.viewportHeight + 1 || !mobilePrivacy.internallyScrollable || mobilePrivacy.bodyHorizontalOverflow) {
+    throw new Error(`Mobile privacy sheet is not contained: ${JSON.stringify(mobilePrivacy)}`)
+  }
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.privacy-sheet', { hidden: true })
+
   if (consoleErrors.length) throw new Error(`Browser errors: ${consoleErrors.join(' | ')}`)
   console.log(JSON.stringify({
     landingPage: true,
+    privacyNotice: true,
     tabletopStartsDirectly: true,
     randomDealFlight: true,
     unsavedCardIdeation: true,
@@ -175,6 +213,7 @@ try {
     reviewDoesNotGenerate: true,
     dealAllUniqueCards: true,
     mobileTableScrolls: true,
+    mobilePrivacyContained: true,
     sparkRequestCount,
   }, null, 2))
 } finally {

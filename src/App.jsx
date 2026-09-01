@@ -239,10 +239,13 @@ function App() {
   const [roomCode, setRoomCode] = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
   const [activeCard, setActiveCard] = useState(null)
   const [scrapbookOpen, setScrapbookOpen] = useState(false)
+  const [privacyOpen, setPrivacyOpen] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState({ key: null, message: '' })
   const activeTriggerRef = useRef(null)
   const scrapbookTriggerRef = useRef(null)
+  const privacyTriggerRef = useRef(null)
   const copyTimerRef = useRef(null)
+  const analyticsEnabled = !['localhost', '127.0.0.1'].includes(window.location.hostname)
 
   useEffect(() => {
     localStorage.setItem('change-cards-session-v1', JSON.stringify(session))
@@ -307,15 +310,35 @@ function App() {
     setRoomCode('')
   }
 
-  if (roomCode) return <CoopWorkshop roomCode={roomCode} onLeave={leaveRoom} />
+  const openPrivacy = (event) => {
+    privacyTriggerRef.current = event.currentTarget
+    setPrivacyOpen(true)
+  }
+
+  const closePrivacy = () => {
+    setPrivacyOpen(false)
+    window.setTimeout(() => privacyTriggerRef.current?.focus?.({ preventScroll: true }), 0)
+  }
+
+  const withPrivacy = (page) => (
+    <>
+      {page}
+      <PrivacyNotice open={privacyOpen} onClose={closePrivacy} />
+      {analyticsEnabled && <Analytics />}
+    </>
+  )
+
+  if (roomCode) {
+    return withPrivacy(
+      <>
+        <CoopWorkshop roomCode={roomCode} onLeave={leaveRoom} />
+        <ProjectCredit compact appFooter privacyOnly onOpenPrivacy={openPrivacy} />
+      </>,
+    )
+  }
 
   if (session.stage === 'intro' || !session.idea) {
-    return (
-      <>
-        <Entry session={session} update={update} onEnterRoom={enterRoom} />
-        <Analytics />
-      </>
-    )
+    return withPrivacy(<Entry session={session} update={update} onEnterRoom={enterRoom} onOpenPrivacy={openPrivacy} />)
   }
 
   const scrapbookOrder = session.scrapbookOrder || []
@@ -342,52 +365,49 @@ function App() {
     update({ scrapbookOrder: order })
   }
 
-  return (
-    <>
-      <main className="app-shell mode-tabletop">
-        <TopBar
-          onRestart={startAgain}
-          savedCards={savedCards}
-          onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
-          onOpenScrapbook={openScrapbook}
-          onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
-          copied={copyFeedback.key === 'all'}
+  return withPrivacy(
+    <main className="app-shell mode-tabletop">
+      <TopBar
+        onRestart={startAgain}
+        savedCards={savedCards}
+        onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+        onOpenScrapbook={openScrapbook}
+        onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
+        copied={copyFeedback.key === 'all'}
+      />
+      {scrapbookOpen && (
+        <Scrapbook
+          idea={session.idea}
+          cards={savedCards}
+          notes={session.swarm}
+          obscured={Boolean(activeCard)}
+          onClose={closeScrapbook}
+          onOpenCard={(cardId, trigger) => openCard(cardId, 'review', trigger)}
+          onReorder={reorderScrapbookCard}
         />
-        {scrapbookOpen && (
-          <Scrapbook
-            idea={session.idea}
-            cards={savedCards}
-            notes={session.swarm}
-            obscured={Boolean(activeCard)}
-            onClose={closeScrapbook}
-            onOpenCard={(cardId, trigger) => openCard(cardId, 'review', trigger)}
-            onReorder={reorderScrapbookCard}
-          />
-        )}
-        <Tabletop
-          session={session}
-          update={update}
-          activeCard={activeCard}
-          savedCards={savedCards}
-          openCard={openCard}
-          closeCard={closeCard}
-          setActiveCard={setActiveCard}
-          copyFeedback={copyFeedback}
-          onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
-        />
-        {copyFeedback.message && (
-          <div className={`feedback-toast ${copyFeedback.key === 'error' ? 'is-error' : ''}`} role={copyFeedback.key === 'error' ? 'alert' : 'status'}>
-            {copyFeedback.message}
-          </div>
-        )}
-        <ProjectCredit compact appFooter hidden={Boolean(activeCard) || scrapbookOpen} />
-      </main>
-      <Analytics />
-    </>
+      )}
+      <Tabletop
+        session={session}
+        update={update}
+        activeCard={activeCard}
+        savedCards={savedCards}
+        openCard={openCard}
+        closeCard={closeCard}
+        setActiveCard={setActiveCard}
+        copyFeedback={copyFeedback}
+        onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
+      />
+      {copyFeedback.message && (
+        <div className={`feedback-toast ${copyFeedback.key === 'error' ? 'is-error' : ''}`} role={copyFeedback.key === 'error' ? 'alert' : 'status'}>
+          {copyFeedback.message}
+        </div>
+      )}
+      <ProjectCredit compact appFooter hidden={Boolean(activeCard) || scrapbookOpen} onOpenPrivacy={openPrivacy} />
+    </main>,
   )
 }
 
-function Entry({ session, update, onEnterRoom }) {
+function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
   const [draft, setDraft] = useState(session.idea)
   const [playMode, setPlayMode] = useState('solo')
   const [roomCodeDraft, setRoomCodeDraft] = useState('')
@@ -499,7 +519,7 @@ function Entry({ session, update, onEnterRoom }) {
             </button>
           </form>
         </section>
-        <ProjectCredit />
+        <ProjectCredit compact appFooter onOpenPrivacy={onOpenPrivacy} />
       </main>
     )
   }
@@ -596,7 +616,7 @@ function Entry({ session, update, onEnterRoom }) {
         </form>
       </section>
 
-      <ProjectCredit />
+      <ProjectCredit compact appFooter onOpenPrivacy={onOpenPrivacy} />
     </main>
   )
 }
@@ -1195,12 +1215,130 @@ function Logo() {
   )
 }
 
-function ProjectCredit({ compact = false, appFooter = false, hidden = false }) {
+function PrivacyNotice({ open, onClose }) {
+  const sheetRef = useRef(null)
+  const closeRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    if (!open) return undefined
+    const previousOverflow = document.body.style.overflow
+    const page = document.querySelector('main')
+    const previousAriaHidden = page?.getAttribute('aria-hidden')
+    document.body.style.overflow = 'hidden'
+    page?.setAttribute('inert', '')
+    page?.setAttribute('aria-hidden', 'true')
+    closeRef.current?.focus({ preventScroll: true })
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const controls = [...(sheetRef.current?.querySelectorAll('a[href], button:not([disabled])') || [])]
+      if (!controls.length) return
+      const first = controls[0]
+      const last = controls.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      page?.removeAttribute('inert')
+      if (previousAriaHidden === null) page?.removeAttribute('aria-hidden')
+      else if (previousAriaHidden !== undefined) page?.setAttribute('aria-hidden', previousAriaHidden)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div className="privacy-layer" role="dialog" aria-modal="true" aria-labelledby="privacy-title" aria-describedby="privacy-intro">
+      <button className="privacy-scrim" type="button" tabIndex={-1} onClick={onClose} aria-label="Close privacy notice" />
+      <article className="privacy-sheet" ref={sheetRef}>
+        <header className="privacy-heading">
+          <div>
+            <p className="eyebrow">Privacy notice · 1 September 2026</p>
+            <h1 id="privacy-title">How your ideas<br /><em>are handled.</em></h1>
+          </div>
+          <button className="privacy-close" ref={closeRef} type="button" onClick={onClose} aria-label="Close privacy notice">×</button>
+          <p id="privacy-intro">Change Cards uses the minimum information needed to run the tool. Please don’t enter confidential information or sensitive personal data about yourself or anyone else.</p>
+        </header>
+
+        <ul className="privacy-at-a-glance" aria-label="Privacy at a glance">
+          <li><strong>Solo</strong><span>Saved in this browser</span></li>
+          <li><strong>Co-op</strong><span>Stored in Supabase</span></li>
+          <li><strong>AI</strong><span>Sent to OpenAI only when requested</span></li>
+        </ul>
+
+        <div className="privacy-details">
+          <section>
+            <h2>On this device</h2>
+            <p>Solo ideas, notes and interface preferences are saved in browser storage. AI suggestions are also cached temporarily for the browser session. Starting again clears the active workshop; clearing this site’s browser data removes the rest.</p>
+            <p>Change Cards uses Vercel Web Analytics to understand broad site usage. Vercel says this records anonymised, aggregated page-view information without cookies; its daily visitor identifier is discarded after 24 hours. It may include the page visited, referrer, approximate location, browser, device and operating system. <a href="https://vercel.com/docs/analytics/privacy-policy" target="_blank" rel="noreferrer">Vercel analytics privacy ↗</a></p>
+          </section>
+
+          <section>
+            <h2>Co-op rooms</h2>
+            <p>Supabase creates an anonymous user ID and stores your display name, room membership, ideas, responses and workshop timestamps. Other people in the room can see your name and workshop content as ideas are passed and revealed.</p>
+            <p>Supabase may record technical authentication logs, including IP address and browser details, to operate and secure the service.</p>
+          </section>
+
+          <section>
+            <h2>Optional AI</h2>
+            <p>When you request a Spark or generated option, the current idea, selected Change Card and recent workshop context are sent through the Change Cards server to OpenAI.</p>
+            <p>OpenAI states that API inputs and outputs are not used to train its models by default. Default abuse-monitoring logs may be retained for up to 30 days. <a href="https://platform.openai.com/docs/models/default-usage-policies-by-endpoint" target="_blank" rel="noreferrer">OpenAI data controls ↗</a></p>
+          </section>
+
+          <section>
+            <h2>Purpose, storage and sharing</h2>
+            <p>The information is used only to provide, secure and understand the use of Change Cards, relying on legitimate interests in operating and improving the workshop. It is not sold or used for advertising. Supabase, Vercel and OpenAI act as service providers and may process information outside the UK under their contractual safeguards.</p>
+            <p>Co-op room records and anonymous accounts do not currently expire automatically; they remain in Supabase until the operator deletes them.</p>
+          </section>
+
+          <section className="privacy-rights">
+            <h2>Your choices and rights</h2>
+            <p>You can clear locally saved information through your browser. To ask for access, correction or deletion of co-op data, contact <a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas ↗</a> and include the room code and display name where possible.</p>
+            <p>You can object to this processing. Depending on the circumstances, you may also have rights to access, correct, delete, restrict or move your personal data, and to complain to the <a href="https://ico.org.uk/make-a-complaint/data-protection-complaints/data-protection-complaints/" target="_blank" rel="noreferrer">UK Information Commissioner ↗</a>.</p>
+          </section>
+        </div>
+
+        <footer className="privacy-footer">
+          <span>Data controller: Juan David Casasbuenas</span>
+          <button type="button" onClick={onClose}>Done</button>
+        </footer>
+      </article>
+    </div>
+  )
+}
+
+function ProjectCredit({ compact = false, appFooter = false, hidden = false, privacyOnly = false, onOpenPrivacy }) {
+  if (privacyOnly) {
+    return (
+      <aside className={`project-credit is-privacy-only ${compact ? 'is-compact' : ''} ${appFooter ? 'is-app-footer' : ''}`} aria-label="Privacy">
+        <button className="privacy-link" type="button" onClick={onOpenPrivacy}>Privacy</button>
+      </aside>
+    )
+  }
+
   return (
     <aside className={`project-credit ${compact ? 'is-compact' : ''} ${appFooter ? 'is-app-footer' : ''} ${hidden ? 'is-hidden' : ''}`} aria-label="About Change Cards">
       <span className="credit-maker"><span className="credit-prefix">A small experiment by </span><a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas</a></span>
       <i className="credit-separator" aria-hidden="true">·</i>
       <span className="credit-context">Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
+      <i className="credit-separator" aria-hidden="true">·</i>
+      <button className="privacy-link" type="button" onClick={onOpenPrivacy}>Privacy</button>
     </aside>
   )
 }
