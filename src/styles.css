@@ -62,7 +62,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-height: 100svh;
-  padding: 28px clamp(24px, 4vw, 68px) 24px;
+  padding: 28px clamp(24px, 4vw, 68px) max(24px, calc(env(safe-area-inset-bottom) + 8px));
   overflow: hidden;
   background:
     linear-gradient(96deg, transparent 0 72%, rgba(23, 23, 19, 0.035) 72% 72.1%, transparent 72.1%),
@@ -243,16 +243,20 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   display: flex;
   justify-self: end;
   align-items: center;
-  gap: 9px;
+  min-width: 0;
+  gap: 0;
   color: rgba(23,23,19,.62);
   font: 400 11px/1.45 'DM Mono', monospace;
   letter-spacing: .012em;
 }
-.project-credit i { color: var(--violet); font-style: normal; }
+.project-credit .credit-maker,
+.project-credit .credit-context { min-width: 0; }
+.project-credit .credit-maker { display: inline-flex; align-items: baseline; }
+.project-credit .credit-separator { flex: 0 0 auto; margin-inline: 8px; color: var(--violet); font-style: normal; }
 .project-credit a { color: var(--ink); font-weight: 500; text-decoration: underline; text-decoration-color: rgba(115,92,148,.46); text-decoration-thickness: 1px; text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
 .project-credit a:hover { color: var(--violet); text-decoration-color: var(--violet); }
 .project-credit a:focus-visible { border-radius: 1px; outline: 2px solid #1572a1; outline-offset: 3px; }
-.project-credit .privacy-link { border: 0; padding: 0; color: var(--ink); background: transparent; cursor: pointer; font: inherit; font-weight: 500; text-decoration: underline; text-decoration-color: rgba(115,92,148,.46); text-decoration-thickness: 1px; text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
+.project-credit .privacy-link { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 28px; border: 0; margin-block: -6px; padding: 6px 0; color: var(--ink); background: transparent; cursor: pointer; font: inherit; font-weight: 500; white-space: nowrap; text-decoration: underline; text-decoration-color: rgba(115,92,148,.46); text-decoration-thickness: 1px; text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
 .project-credit .privacy-link:hover { color: var(--violet); text-decoration-color: var(--violet); }
 
 .privacy-layer { position: fixed; z-index: 500; inset: 0; display: grid; place-items: center; padding: 20px; }
@@ -333,19 +337,25 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 .topbar-workshop { display: flex; align-items: center; gap: 22px; min-width: 0; }
 .topbar-actions { display: flex; flex: 0 0 auto; align-items: center; gap: clamp(14px, 2vw, 27px); }
-.project-credit.is-compact { flex: 0 0 auto; justify-self: auto; gap: 7px; color: rgba(23,23,19,.56); font-size: 10px; white-space: nowrap; }
+.project-credit.is-compact { flex: 0 0 auto; justify-self: auto; color: rgba(23,23,19,.56); font-size: 10px; white-space: nowrap; }
 .project-credit.is-compact .credit-prefix { font-size: 0; }
 .project-credit.is-compact .credit-prefix::before { content: 'By '; font-size: 10px; }
 .project-credit.is-app-footer {
   position: fixed;
   z-index: 90;
   left: 50%;
-  bottom: max(6px, env(safe-area-inset-bottom));
+  bottom: max(8px, calc(env(safe-area-inset-bottom) + 4px));
   width: max-content;
-  max-width: calc(100vw - 28px);
-  padding: 3px 8px;
-  opacity: .58;
-  filter: drop-shadow(0 1px 0 rgba(250,247,237,.8));
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  border: 1px solid rgba(23,23,19,.08);
+  border-radius: 999px;
+  padding: 5px 11px;
+  opacity: .64;
+  background: rgba(247,243,233,.76);
+  box-shadow: 0 2px 10px rgba(42,38,29,.05);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   pointer-events: none;
   transform: translateX(-50%);
   transition: opacity 180ms ease, visibility 180ms ease;
@@ -355,7 +365,17 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .project-credit.is-app-footer:focus-within,
 .project-credit.is-app-footer:hover { opacity: .92; }
 .project-credit.is-app-footer.is-hidden { opacity: 0; visibility: hidden; }
-.project-credit.is-privacy-only { padding-inline: 10px; opacity: .5; }
+.project-credit.is-privacy-only { opacity: .56; }
+.entry-page > .project-credit.is-app-footer {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  justify-self: center;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 8px;
+  transform: none;
+}
 .logo-button { flex: 0 0 auto; }
 .saved-pins { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .saved-copy-button {
@@ -1801,7 +1821,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
     min-height: 0;
     overflow: hidden;
   }
-  .entry-page { padding: 20px; }
+  .entry-page { padding: 20px 20px max(20px, calc(env(safe-area-inset-bottom) + 8px)); }
   .entry-content { align-content: center; padding: 50px 0; }
   .entry-doodle-wallpaper {
     inset: -5vh -19vw;
@@ -1816,7 +1836,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .entry-content::before { inset: -4% -16%; opacity: 0.94; }
   .entry-copy h1 { font-size: clamp(46px, 13.2vw, 64px); line-height: 0.9; }
   .idea-form textarea { min-height: 180px; padding: 28px 22px 42px; font-size: 16px; }
-  .project-credit { justify-self: start; flex-wrap: wrap; gap: 3px 7px; max-width: 36em; font-size: 10px; line-height: 1.5; }
+  .project-credit { justify-self: start; max-width: 36em; font-size: 10px; line-height: 1.5; }
   .privacy-layer { align-items: end; padding: 0; }
   .privacy-sheet { width: 100%; max-height: 92dvh; border-inline: 0; border-bottom: 0; border-radius: 18px 18px 0 0; padding: 34px 20px max(24px,calc(env(safe-area-inset-bottom) + 18px)); box-shadow: 0 -22px 60px rgba(31,27,19,.25); transform: none; }
   .privacy-sheet::before { top: 7px; }
@@ -1850,10 +1870,13 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .scrapbook-nav-button span { display: none; }
   .scrapbook-nav-tip { position: absolute; top: calc(100% + 8px); right: -5px; display: block; width: max-content; border: 1px solid rgba(23,23,19,.38); padding: 7px 9px 6px; color: var(--paper-light); background: var(--violet); box-shadow: 3px 4px 0 rgba(23,23,19,.1); font: 500 8px/1 'DM Mono'; letter-spacing: .05em; text-transform: uppercase; transform: rotate(-2deg); animation: scrapbookTipIn 280ms 480ms ease both; }
   .scrapbook-nav-tip::before { content: ''; position: absolute; top: -5px; right: 18px; width: 8px; height: 8px; border-top: 1px solid rgba(23,23,19,.38); border-left: 1px solid rgba(23,23,19,.38); background: var(--violet); transform: rotate(45deg); }
-  .project-credit.is-compact { display: block; max-width: 100%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; }
+  .project-credit.is-app-footer.is-compact { display: flex; justify-content: center; width: max-content; max-width: calc(100vw - 24px); overflow: visible; padding: 5px 10px; font-size: 10px; line-height: 1.2; text-overflow: clip; }
   .project-credit.is-compact .credit-prefix { display: none; }
-  .project-credit.is-compact .credit-separator,
+  .project-credit.is-compact .credit-context-separator,
   .project-credit.is-compact .credit-context { display: none; }
+  .project-credit.is-compact .credit-maker { flex: 1 1 auto; overflow: hidden; }
+  .project-credit.is-compact .credit-maker a { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .project-credit.is-compact .credit-privacy-separator { display: inline; margin-inline: 8px; }
   .saved-pins { flex: 1; gap: 4px; min-width: 0; }
   .saved-copy-button { gap: 4px; min-width: 70px; min-height: 40px; padding-inline: 1px; font-size: 8px; touch-action: manipulation; }
   .saved-copy-button svg { width: 14px; height: 14px; }

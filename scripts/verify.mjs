@@ -49,6 +49,35 @@ try {
   if (!landing.text.includes('Push an idea') || !landing.text.includes('What are you working on?')) throw new Error('Landing page content is missing')
   if (!landing.favicon || landing.creatorLink !== 'https://jdcasasbuenas.com') throw new Error('Landing page identity metadata is missing')
 
+  for (const width of [1440, 821, 820, 658, 390, 320]) {
+    await page.setViewport({ width, height: 900, deviceScaleFactor: 1 })
+    const footerLayout = await page.$eval('.project-credit.is-app-footer', (element) => {
+      const footer = element.getBoundingClientRect()
+      const visibleItems = [...element.children]
+        .filter((child) => getComputedStyle(child).display !== 'none')
+        .map((child) => {
+          const rect = child.getBoundingClientRect()
+          return { className: child.className, left: rect.left, right: rect.right }
+        })
+      return {
+        position: getComputedStyle(element).position,
+        footer: { left: footer.left, right: footer.right },
+        visibleItems,
+        viewportWidth: innerWidth,
+        horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+      }
+    })
+    const itemsOverlap = footerLayout.visibleItems.some((item, index) => (
+      index < footerLayout.visibleItems.length - 1 && item.right > footerLayout.visibleItems[index + 1].left + 0.5
+    ))
+    const privacyVisible = footerLayout.visibleItems.some((item) => item.className.includes('privacy-link'))
+    const contextVisible = footerLayout.visibleItems.some((item) => item.className.includes('credit-context') && !item.className.includes('separator'))
+    if (footerLayout.position !== 'relative' || footerLayout.footer.left < -1 || footerLayout.footer.right > footerLayout.viewportWidth + 1 || footerLayout.horizontalOverflow || itemsOverlap || !privacyVisible || (width <= 820 && contextVisible)) {
+      throw new Error(`Footer does not adapt cleanly at ${width}px: ${JSON.stringify(footerLayout)}`)
+    }
+  }
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 })
+
   const privacyTrigger = await page.$('.project-credit .privacy-link')
   if (!privacyTrigger) throw new Error('The footer does not expose the privacy notice')
   await privacyTrigger.click()
@@ -155,6 +184,25 @@ try {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
   await page.mouse.move(0, 0)
   await new Promise((resolve) => setTimeout(resolve, 400))
+  const workshopFooter = await page.$eval('.project-credit.is-app-footer', (element) => {
+    const footer = element.getBoundingClientRect()
+    const items = [...element.children]
+      .filter((child) => getComputedStyle(child).display !== 'none')
+      .map((child) => {
+        const rect = child.getBoundingClientRect()
+        return { left: rect.left, right: rect.right }
+      })
+    return {
+      position: getComputedStyle(element).position,
+      left: footer.left,
+      right: footer.right,
+      viewportWidth: innerWidth,
+      itemsOverlap: items.some((item, index) => index < items.length - 1 && item.right > items[index + 1].left + 0.5),
+    }
+  })
+  if (workshopFooter.position !== 'fixed' || workshopFooter.left < -1 || workshopFooter.right > workshopFooter.viewportWidth + 1 || workshopFooter.itemsOverlap) {
+    throw new Error(`Workshop footer is not contained on mobile: ${JSON.stringify(workshopFooter)}`)
+  }
   const mobileTable = await page.$eval('.tabletop', (element) => ({
     scrollable: element.scrollHeight > element.clientHeight,
     cardCount: element.querySelectorAll('.tabletop-canvas > .table-card-shell').length,
@@ -205,6 +253,7 @@ try {
   if (consoleErrors.length) throw new Error(`Browser errors: ${consoleErrors.join(' | ')}`)
   console.log(JSON.stringify({
     landingPage: true,
+    responsiveFooter: true,
     privacyNotice: true,
     tabletopStartsDirectly: true,
     randomDealFlight: true,
@@ -213,6 +262,7 @@ try {
     reviewDoesNotGenerate: true,
     dealAllUniqueCards: true,
     mobileTableScrolls: true,
+    mobileWorkshopFooter: true,
     mobilePrivacyContained: true,
     sparkRequestCount,
   }, null, 2))

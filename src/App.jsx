@@ -1335,9 +1335,9 @@ function ProjectCredit({ compact = false, appFooter = false, hidden = false, pri
   return (
     <aside className={`project-credit ${compact ? 'is-compact' : ''} ${appFooter ? 'is-app-footer' : ''} ${hidden ? 'is-hidden' : ''}`} aria-label="About Change Cards">
       <span className="credit-maker"><span className="credit-prefix">A small experiment by </span><a href="https://jdcasasbuenas.com" target="_blank" rel="noreferrer">Juan David Casasbuenas</a></span>
-      <i className="credit-separator" aria-hidden="true">·</i>
+      <i className="credit-separator credit-context-separator" aria-hidden="true">·</i>
       <span className="credit-context">Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
-      <i className="credit-separator" aria-hidden="true">·</i>
+      <i className="credit-separator credit-privacy-separator" aria-hidden="true">·</i>
       <button className="privacy-link" type="button" onClick={onOpenPrivacy}>Privacy</button>
     </aside>
   )
