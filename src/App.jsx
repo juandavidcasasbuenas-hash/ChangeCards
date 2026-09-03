@@ -58,6 +58,46 @@ const CARDS = [
   { id: 40, category: 'flexible', label: 'Being flexible', title: 'Move the Boundary', provocation: 'What changes if something currently inside the idea moves outside it — or vice versa?', sparkBrief: 'Identify specific responsibilities, steps, audiences or resources that could move across the idea’s current boundary.' },
 ]
 
+const CURATED_ROUTES = [
+  {
+    id: 'assumption-to-evidence',
+    name: 'From assumption to evidence',
+    purpose: 'Turn uncertainty into evidence.',
+    cardIds: [13, 7, 14, 15],
+  },
+  {
+    id: 'designed-with-people',
+    name: 'Designed with people, not for them',
+    purpose: 'Give affected people real authorship.',
+    cardIds: [19, 4, 29, 31],
+  },
+  {
+    id: 'creative-breakthrough',
+    name: 'The creative breakthrough',
+    purpose: 'Escape the predictable answer.',
+    cardIds: [6, 22, 20, 8],
+  },
+  {
+    id: 'make-it-catch-on',
+    name: 'Make it catch on',
+    purpose: 'Grow something people carry forward.',
+    cardIds: [23, 30, 32, 34],
+  },
+  {
+    id: 'build-for-uncertainty',
+    name: 'Build for uncertainty',
+    purpose: 'Make the idea resilient and adaptable.',
+    cardIds: [40, 36, 24, 37],
+  },
+]
+
+const ROUTE_CARD_POSITIONS = [
+  { x: 21, y: 8 },
+  { x: 72, y: 8 },
+  { x: 72, y: 68 },
+  { x: 21, y: 68 },
+]
+
 const CARD_ICON_FILES = [
   '01-borrow-a-brain.png',
   '02-the-wrong-expert.png',
@@ -174,6 +214,7 @@ const DEFAULT_SESSION = {
   dealtCardIds: [],
   cardPositions: {},
   scrapbookOrder: [],
+  activeRouteId: null,
 }
 
 function loadSession() {
@@ -207,7 +248,15 @@ async function requestTransformations(payload, force = false) {
 }
 
 async function requestSparks(payload, force = false) {
-  const context = JSON.stringify([payload.originalIdea, payload.currentIdea, payload.cardTitle, payload.previousTransformations])
+  const context = JSON.stringify([
+    payload.originalIdea,
+    payload.currentIdea,
+    payload.cardTitle,
+    payload.previousTransformations,
+    payload.routeId,
+    payload.routeStep,
+    payload.previousRouteResponses,
+  ])
   let signature = 0
   for (let index = 0; index < context.length; index += 1) signature = ((signature * 31) + context.charCodeAt(index)) | 0
   const key = ['sparks-luna-v4', payload.cardTitle, signature.toString(36)].join('::')
@@ -518,6 +567,7 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
       cardPositions: {},
       swarm: {},
       scrapbookOrder: [],
+      activeRouteId: null,
     })
   }
 
@@ -1655,13 +1705,21 @@ function OriginalNote({ idea, compact = false, scrapbook = false }) {
 function Tabletop({ session, update, activeCard: activeState, savedCards, openCard: openActiveCard, closeCard, setActiveCard, copyFeedback, onCopyIdea }) {
   const canvasRef = useRef(null)
   const deckRef = useRef(null)
+  const routesButtonRef = useRef(null)
   const modalRef = useRef(null)
   const sparkRequestsRef = useRef(new Set())
+  const routeArrivalTimerRef = useRef(null)
+  const routeExitTimerRef = useRef(null)
+  const routeLeavingTimerRef = useRef(null)
   const [sparkStates, setSparkStates] = useState({})
   const [tableScrolled, setTableScrolled] = useState(false)
   const [dragOverDeck, setDragOverDeck] = useState(false)
   const [mobileRearranging, setMobileRearranging] = useState(false)
   const [dealFlight, setDealFlight] = useState(null)
+  const [routesOpen, setRoutesOpen] = useState(false)
+  const [routeArrivalIds, setRouteArrivalIds] = useState(() => new Set())
+  const [leavingRoute, setLeavingRoute] = useState(null)
+  const [routeCelebration, setRouteCelebration] = useState(false)
   const [coachStep, setCoachStep] = useState(() => {
     try {
       if (localStorage.getItem('change-cards-onboarding-v2') === 'complete') return 'complete'
@@ -1673,11 +1731,37 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const cardPositions = session.cardPositions || {}
   const notes = session.swarm || {}
   const remainingCards = CARDS.filter((card) => !dealtCardIds.includes(card.id))
+  const activeRoute = CURATED_ROUTES.find((route) => route.id === session.activeRouteId) || null
+  const layoutRoute = activeRoute || leavingRoute
+  const activeRouteCardIds = activeRoute?.cardIds || []
+  const displayedCardIds = activeRoute
+    ? [...activeRouteCardIds.filter((cardId) => dealtCardIds.includes(cardId)), ...dealtCardIds.filter((cardId) => !activeRouteCardIds.includes(cardId))]
+    : dealtCardIds
+  const routeCompletedCount = activeRouteCardIds.filter((cardId) => notes[cardId]?.visited).length
+  const nextRouteCardId = activeRouteCardIds.find((cardId) => !notes[cardId]?.visited) || null
   const activeCard = CARDS.find((card) => card.id === activeState?.cardId)
   const activeMode = activeState?.mode
   const reviewIndex = activeMode === 'review' ? savedCards.findIndex((card) => card.id === activeCard?.id) : -1
   const previousSavedCard = reviewIndex > 0 ? savedCards[reviewIndex - 1] : null
   const nextSavedCard = reviewIndex >= 0 && reviewIndex < savedCards.length - 1 ? savedCards[reviewIndex + 1] : null
+
+  useEffect(() => () => {
+    window.clearTimeout(routeArrivalTimerRef.current)
+    window.clearTimeout(routeExitTimerRef.current)
+    window.clearTimeout(routeLeavingTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (!routesOpen) return undefined
+    const closeRoutesWithEscape = (event) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setRoutesOpen(false)
+      window.setTimeout(() => routesButtonRef.current?.focus({ preventScroll: true }), 0)
+    }
+    window.addEventListener('keydown', closeRoutesWithEscape)
+    return () => window.removeEventListener('keydown', closeRoutesWithEscape)
+  }, [routesOpen])
 
   useEffect(() => {
     if (!activeCard) return undefined
@@ -1834,12 +1918,56 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     update({ dealtCardIds: [...dealtCardIds, ...shuffleCards(remainingCards).map((card) => card.id)] })
   }
 
+  function activateRoute(route) {
+    if (dealFlight) return
+    window.clearTimeout(routeArrivalTimerRef.current)
+    window.clearTimeout(routeExitTimerRef.current)
+    window.clearTimeout(routeLeavingTimerRef.current)
+    const missingCardIds = route.cardIds.filter((cardId) => !dealtCardIds.includes(cardId))
+    setLeavingRoute(null)
+    setRouteCelebration(false)
+    setRouteArrivalIds(new Set(missingCardIds))
+    setRoutesOpen(false)
+    update({
+      activeRouteId: route.id,
+      dealtCardIds: [...dealtCardIds, ...missingCardIds],
+    })
+    routeArrivalTimerRef.current = window.setTimeout(() => setRouteArrivalIds(new Set()), 1350)
+    window.setTimeout(() => {
+      const firstUnfinishedId = route.cardIds.find((cardId) => !notes[cardId]?.visited)
+      canvasRef.current?.querySelector(`[data-card-id="${firstUnfinishedId || route.cardIds[0]}"]`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      })
+    }, 280)
+  }
+
+  function exitRoute(route = activeRoute) {
+    if (!route) return
+    window.clearTimeout(routeExitTimerRef.current)
+    window.clearTimeout(routeLeavingTimerRef.current)
+    setRoutesOpen(false)
+    setRouteCelebration(false)
+    setLeavingRoute(route)
+    update({ activeRouteId: null })
+    routeLeavingTimerRef.current = window.setTimeout(() => setLeavingRoute(null), 720)
+  }
+
   function returnCard(cardId) {
     const nextPositions = { ...cardPositions }
     delete nextPositions[cardId]
+    const cardBelongsToRoute = activeRoute?.cardIds.includes(cardId)
+    if (cardBelongsToRoute) {
+      window.clearTimeout(routeExitTimerRef.current)
+      setLeavingRoute(activeRoute)
+      setRouteCelebration(false)
+      routeLeavingTimerRef.current = window.setTimeout(() => setLeavingRoute(null), 720)
+    }
     update({
       dealtCardIds: dealtCardIds.filter((id) => id !== cardId),
       cardPositions: nextPositions,
+      ...(cardBelongsToRoute ? { activeRouteId: null } : {}),
     })
     setSparkStates((current) => {
       const next = { ...current }
@@ -1873,6 +2001,15 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
       [card.id]: { cardId: card.id, loading: true, sparks: [], error: null },
     }))
     try {
+      const routeStepIndex = activeRoute?.cardIds.indexOf(card.id) ?? -1
+      const previousRouteResponses = routeStepIndex > 0
+        ? activeRoute.cardIds.slice(0, routeStepIndex).flatMap((cardId) => {
+          const routeCard = CARDS.find((item) => item.id === cardId)
+          const response = notes[cardId]?.note?.trim()
+          if (!routeCard || !response) return []
+          return [{ cardTitle: routeCard.title, response }]
+        })
+        : []
       const sparks = await requestSparks({
         originalIdea: session.idea,
         currentIdea: session.idea,
@@ -1881,6 +2018,12 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         cardProvocation: card.provocation,
         cardSparkBrief: card.sparkBrief,
         previousTransformations: noteContext,
+        routeId: activeRoute?.id,
+        routeName: activeRoute?.name,
+        routePurpose: activeRoute?.purpose,
+        routeStep: routeStepIndex >= 0 ? routeStepIndex + 1 : undefined,
+        routeLength: routeStepIndex >= 0 ? activeRoute.cardIds.length : undefined,
+        previousRouteResponses,
       }, force)
       setSparkStates((current) => ({
         ...current,
@@ -1914,19 +2057,36 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     const cleanNote = note.trim()
     if (!cleanNote) return
     if (import.meta.env.DEV) console.info('[change-cards:save]', { stage: 'commit', cardId: card.id, noteLength: cleanNote.length })
+    const nextNotes = {
+      ...notes,
+      [card.id]: { note: cleanNote, visited: true, updatedAt: Date.now() },
+    }
     update({
-      swarm: {
-        ...notes,
-        [card.id]: { note: cleanNote, visited: true, updatedAt: Date.now() },
-      },
+      swarm: nextNotes,
     })
     setSparkStates({})
     closeCard()
+    if (!activeRoute?.cardIds.includes(card.id)) return
+    const nextUnfinishedId = activeRoute.cardIds.find((cardId) => !nextNotes[cardId]?.visited)
+    if (nextUnfinishedId) {
+      if (window.matchMedia?.(COMPACT_TABLE_QUERY).matches) {
+        window.setTimeout(() => {
+          canvasRef.current?.querySelector(`[data-card-id="${nextUnfinishedId}"]`)?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest',
+          })
+        }, 360)
+      }
+      return
+    }
+    setRouteCelebration(true)
+    routeExitTimerRef.current = window.setTimeout(() => exitRoute(activeRoute), 1500)
   }
 
   return (
     <section
-      className={`tabletop ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''}`}
+      className={`tabletop ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
       aria-label="Change Cards idea table"
       onScroll={(event) => setTableScrolled(event.currentTarget.scrollTop > 32)}
     >
@@ -1955,28 +2115,86 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         {(dragOverDeck || !remainingCards.length) && <p>{dragOverDeck ? 'Drop to return it' : 'All cards dealt'}</p>}
         <div className="deal-controls">
           <button className="deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>Deal all</button>
+          <button
+            ref={routesButtonRef}
+            className={`routes-button ${routesOpen ? 'is-open' : ''}`}
+            type="button"
+            aria-expanded={routesOpen}
+            aria-controls="curated-routes"
+            disabled={Boolean(dealFlight)}
+            onClick={() => setRoutesOpen((open) => !open)}
+          >
+            Routes
+          </button>
         </div>
       </aside>
 
       <div className="tabletop-canvas" ref={canvasRef}>
         <OriginalNote idea={session.idea} />
 
-        {dealtCardIds.map((cardId, index) => {
+        {routesOpen && (
+          <button
+            className="route-chooser-scrim"
+            type="button"
+            tabIndex={-1}
+            aria-label="Close routes"
+            onClick={() => {
+              setRoutesOpen(false)
+              window.setTimeout(() => routesButtonRef.current?.focus({ preventScroll: true }), 0)
+            }}
+          />
+        )}
+
+        {routesOpen && (
+          <RouteChooser
+            routes={CURATED_ROUTES}
+            activeRouteId={activeRoute?.id}
+            onChoose={activateRoute}
+            onClose={() => {
+              setRoutesOpen(false)
+              window.setTimeout(() => routesButtonRef.current?.focus({ preventScroll: true }), 0)
+            }}
+          />
+        )}
+
+        {activeRoute && (
+          <>
+            <RouteRibbon
+              route={activeRoute}
+              notes={notes}
+              completedCount={routeCompletedCount}
+              celebrating={routeCelebration}
+              onExit={() => exitRoute(activeRoute)}
+            />
+            <RoutePath route={activeRoute} notes={notes} />
+          </>
+        )}
+
+        {displayedCardIds.map((cardId, displayIndex) => {
           const card = CARDS.find((item) => item.id === cardId)
           if (!card) return null
+          const baseIndex = dealtCardIds.indexOf(cardId)
+          const routeStep = layoutRoute?.cardIds.indexOf(cardId) ?? -1
+          const isRouteCard = routeStep >= 0
+          const routePosition = activeRoute && isRouteCard ? ROUTE_CARD_POSITIONS[routeStep] : null
           return (
             <DraggableTableCard
               key={card.id}
               card={card}
-              index={index}
-              previousCardId={dealtCardIds[index - 1]}
-              nextCardId={dealtCardIds[index + 1]}
+              index={baseIndex}
+              previousCardId={displayedCardIds[displayIndex - 1]}
+              nextCardId={displayedCardIds[displayIndex + 1]}
               canvasRef={canvasRef}
-              position={cardPositions[card.id] || defaultPosition(index)}
+              position={routePosition || cardPositions[card.id] || defaultPosition(baseIndex)}
               isDealing={dealFlight?.id === card.id}
+              routeStep={isRouteCard ? routeStep : null}
+              routeComplete={isRouteCard && Boolean(notes[card.id]?.visited)}
+              routeNext={activeRoute && card.id === nextRouteCardId}
+              routeBackground={Boolean(activeRoute && !isRouteCard)}
+              routeDealing={routeArrivalIds.has(card.id)}
               visited={Boolean(notes[card.id]?.visited)}
               savedNote={notes[card.id]?.note || ''}
-              onMove={(position) => moveCard(card.id, position)}
+              onMove={(position) => { if (!activeRoute || !isRouteCard) moveCard(card.id, position) }}
               onReorder={(targetId) => reorderCard(card.id, targetId)}
               deckRef={deckRef}
               onReturn={() => returnCard(card.id)}
@@ -1985,7 +2203,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
               onMobileDragEnd={() => setMobileRearranging(false)}
               onOpen={(trigger) => openCard(card, trigger)}
               onWarm={() => { if (!notes[card.id]?.visited) ensureSparks(card) }}
-              showCoachmark={coachStep === 'card' && index === 0}
+              showCoachmark={!activeRoute && coachStep === 'card' && displayIndex === 0}
             />
           )
         })}
@@ -2057,7 +2275,120 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   )
 }
 
-function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef, deckRef, position, isDealing, visited, savedNote, onMove, onReorder, onReturn, onDeckTarget, onMobileDragStart, onMobileDragEnd, onOpen, onWarm, showCoachmark }) {
+function RouteChooser({ routes, activeRouteId, onChoose, onClose }) {
+  const slipsRef = useRef(null)
+  const [scrollEdges, setScrollEdges] = useState({ previous: false, next: false })
+
+  useEffect(() => {
+    const slips = slipsRef.current
+    if (!slips) return undefined
+    let frame
+    const syncEdges = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        const maxScroll = Math.max(0, slips.scrollWidth - slips.clientWidth)
+        setScrollEdges({
+          previous: slips.scrollLeft > 4,
+          next: maxScroll - slips.scrollLeft > 4,
+        })
+      })
+    }
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(syncEdges) : null
+    observer?.observe(slips)
+    slips.addEventListener('scroll', syncEdges, { passive: true })
+    window.addEventListener('resize', syncEdges)
+    syncEdges()
+    return () => {
+      window.cancelAnimationFrame(frame)
+      observer?.disconnect()
+      slips.removeEventListener('scroll', syncEdges)
+      window.removeEventListener('resize', syncEdges)
+    }
+  }, [routes.length])
+
+  const scrollRoutes = (direction) => {
+    const slips = slipsRef.current
+    const firstSlip = slips?.querySelector('.route-slip')
+    if (!slips || !firstSlip) return
+    const gap = Number.parseFloat(window.getComputedStyle(slips).columnGap || window.getComputedStyle(slips).gap) || 0
+    slips.scrollBy({ left: direction * (firstSlip.getBoundingClientRect().width + gap), behavior: 'smooth' })
+  }
+
+  return (
+    <section id="curated-routes" className="route-chooser" aria-label="Curated routes">
+      <h2 className="sr-only">Choose a four-card route</h2>
+      <button className="route-chooser-close" type="button" onClick={onClose} aria-label="Close routes">×</button>
+      <div ref={slipsRef} className="route-slips">
+        {routes.map((route, routeIndex) => (
+          <button
+            key={route.id}
+            type="button"
+            className={`route-slip ${activeRouteId === route.id ? 'is-active' : ''}`}
+            style={{ '--route-slip-tilt': `${[-1.1, .7, -.45, .9, -.7][routeIndex]}deg`, '--route-slip-delay': `${routeIndex * 45}ms` }}
+            aria-pressed={activeRouteId === route.id}
+            onClick={() => onChoose(route)}
+          >
+            <strong>{route.name}</strong>
+            <span>{route.purpose}</span>
+            <i className="route-slip-cards" aria-hidden="true">
+              {route.cardIds.map((cardId, stepIndex) => {
+                const card = CARDS.find((item) => item.id === cardId)
+                return (
+                  <b key={cardId} className={`category-${card.category}`}>
+                    <CardIcon id={cardId} />
+                    <small>{stepIndex + 1}</small>
+                  </b>
+                )
+              })}
+            </i>
+          </button>
+        ))}
+      </div>
+      {scrollEdges.previous && (
+        <button className="route-scroll-button is-previous" type="button" onClick={() => scrollRoutes(-1)} aria-label="Show previous route">
+          <span aria-hidden="true">←</span>
+        </button>
+      )}
+      {scrollEdges.next && (
+        <button className="route-scroll-button is-next" type="button" onClick={() => scrollRoutes(1)} aria-label="Show next route">
+          <span aria-hidden="true">→</span>
+        </button>
+      )}
+    </section>
+  )
+}
+
+function RouteRibbon({ route, notes, completedCount, celebrating, onExit }) {
+  return (
+    <aside className={`route-ribbon ${celebrating ? 'is-celebrating' : ''}`} aria-live="polite">
+      <div>
+        <strong>{celebrating ? 'Route complete' : route.name}</strong>
+        <span>{completedCount} / {route.cardIds.length}</span>
+      </div>
+      <ol aria-label={`${completedCount} of ${route.cardIds.length} route cards complete`}>
+        {route.cardIds.map((cardId, index) => (
+          <li key={cardId} className={notes[cardId]?.visited ? 'is-complete' : ''}>
+            <span>{index + 1}</span>
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={onExit} aria-label={`Leave ${route.name}`}>×</button>
+    </aside>
+  )
+}
+
+function RoutePath({ route, notes }) {
+  const segmentComplete = (index) => Boolean(notes[route.cardIds[index]]?.visited)
+  return (
+    <svg className="route-path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path className={segmentComplete(0) ? 'is-complete' : ''} d="M 28 19 C 41 15, 60 15, 77 19" />
+      <path className={segmentComplete(1) ? 'is-complete' : ''} d="M 79 27 C 82 42, 82 60, 78 77" />
+      <path className={segmentComplete(2) ? 'is-complete' : ''} d="M 72 82 C 58 87, 42 87, 28 81" />
+    </svg>
+  )
+}
+
+function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef, deckRef, position, isDealing, routeStep, routeComplete, routeNext, routeBackground, routeDealing, visited, savedNote, onMove, onReorder, onReturn, onDeckTarget, onMobileDragStart, onMobileDragEnd, onOpen, onWarm, showCoachmark }) {
   const [localPosition, setLocalPosition] = useState(position)
   const [mobileDragOffset, setMobileDragOffset] = useState({ x: 0, y: 0 })
   const [mobileDragging, setMobileDragging] = useState(false)
@@ -2306,12 +2637,16 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
 
   return (
     <div
-      className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''} ${showCoachmark ? 'has-coachmark' : ''} ${mobileDragging ? 'is-mobile-dragging' : ''}`}
+      className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''} ${routeStep !== null ? 'is-route-card' : ''} ${routeComplete ? 'is-route-complete' : ''} ${routeNext ? 'is-route-next' : ''} ${routeBackground ? 'is-route-background' : ''} ${routeDealing ? 'is-route-dealing' : ''} ${showCoachmark ? 'has-coachmark' : ''} ${mobileDragging ? 'is-mobile-dragging' : ''}`}
       data-card-id={card.id}
+      data-route-step={routeStep !== null ? routeStep + 1 : undefined}
       style={{
         left: `${localPosition.x}%`,
         top: `${localPosition.y}%`,
         '--table-z': index + 2,
+        '--route-arrival-delay': routeStep !== null ? `${routeStep * 90}ms` : '0ms',
+        '--route-flight-x': routeStep === 0 || routeStep === 3 ? '-18vw' : '-69vw',
+        '--route-flight-y': routeStep === 0 || routeStep === 1 ? '-5vh' : '-55vh',
         '--mobile-drag-x': `${mobileDragOffset.x}px`,
         '--mobile-drag-y': `${mobileDragOffset.y}px`,
       }}
@@ -2322,6 +2657,11 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
       onPointerEnter={onWarm}
     >
       <ChangeCard card={card} index={index} onSelect={select} faceDown={visited} used={visited} savedNote={savedNote} />
+      {routeStep !== null && (
+        <span className="route-step-marker" aria-label={`Route step ${routeStep + 1}${routeComplete ? ', complete' : routeNext ? ', next' : ''}`}>
+          {routeComplete ? '✓' : routeStep + 1}
+        </span>
+      )}
       <button
         className="mobile-card-drag-handle"
         type="button"
