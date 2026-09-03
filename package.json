@@ -11,6 +11,7 @@
     "start": "node server.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:coop-routing": "node scripts/verify-coop-routing.mjs",
+    "verify:sparks:new": "node scripts/verify-new-sparks.mjs",
     "verify:saved": "node scripts/verify-saved.mjs"
   },
   "dependencies": {

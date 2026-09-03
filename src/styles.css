@@ -790,6 +790,17 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .table-card-shell .change-card.is-face-down .used-card-back > span { font-size: 6px; opacity: .68; }
 .table-card-shell .change-card.is-face-down .used-card-back strong { font-size: clamp(10px, .82vw, 13px); line-height: .98; }
 .saved-note { display: -webkit-box; align-self: stretch; margin: 0; overflow: hidden; color: rgba(250,247,237,.82); font: 400 clamp(7px, .58vw, 9px)/1.18 'DM Sans'; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
+
+@media (min-width: 821px) {
+  .tabletop.is-dense { overflow-y: auto; }
+  .tabletop.is-dense .tabletop-canvas { min-height: 720px; }
+  .tabletop.is-dense .table-card-shell { width: clamp(72px, 7vw, 112px); }
+  .tabletop.is-dense .table-card-shell .card-front { grid-template-rows: auto minmax(38px, 1fr) auto; gap: 4px; padding: 7px 7px 11px; }
+  .tabletop.is-dense .table-card-shell .card-category { font-size: 5.5px; }
+  .tabletop.is-dense .table-card-shell .card-symbol { min-height: 38px; }
+  .tabletop.is-dense .table-card-shell .card-icon { width: clamp(31px, 3vw, 46px); height: clamp(31px, 3vw, 46px); }
+  .tabletop.is-dense .table-card-shell .card-front strong { font-size: clamp(11px, .95vw, 15px); line-height: .93; }
+}
 .active-card-layer { position: fixed; z-index: 180; inset: var(--workshop-viewport-offset, 0px) 0 auto; display: grid; place-items: center; width: 100%; height: var(--workshop-viewport-height, 100dvh); padding: 25px; perspective: 1400px; }
 .active-card-scrim { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(35,30,22,.46); backdrop-filter: blur(5px); cursor: default; animation: tableDim 260ms ease both; }
 .active-card-wrap { position: relative; z-index: 1; width: min(440px, calc(100vw - 38px), calc((var(--workshop-viewport-height, 100dvh) - 50px) * 5 / 7)); animation: liftCard 520ms cubic-bezier(.18,.82,.2,1) both; }
@@ -916,6 +927,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: contain;
+}
+.sprite-card-icon {
+  -webkit-mask-position: var(--card-icon-position);
+  -webkit-mask-size: 600% 400%;
+  mask-position: var(--card-icon-position);
+  mask-size: 600% 400%;
 }
 .card-front strong { position: relative; z-index: 1; display: -webkit-box; align-self: end; max-width: 11ch; margin: 0; overflow: hidden; font: 600 clamp(18px, 1.55vw, 27px)/.94 'DM Sans'; letter-spacing: -.055em; text-transform: uppercase; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 .card-back { transform: rotateY(180deg); background: var(--ink); }
@@ -1558,15 +1575,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   box-shadow: 0 3px 7px rgba(45, 38, 27, .1), 0 18px 34px rgba(45, 38, 27, .12);
 }
 .original-note { align-items: flex-start; flex-direction: column; justify-content: center; }
-.original-note > span {
-  display: block;
-  margin-bottom: 10px;
-  color: rgba(27, 26, 23, .6);
-  font: 500 10px/1 'DM Mono';
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-.original-note.compact > span { margin-bottom: 5px; font-size: 8px; }
 .original-note.compact p { max-height: 2.6em; }
 
 .card-face { border-color: var(--rule-strong); border-radius: 10px; }
@@ -2270,7 +2278,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .onboarding-hint small { font-size: 8px; }
   .deck-onboarding-hint strong { font-size: 14px; }
 
-  .original-note > span { font-size: 8px; }
   .feedback-toast { bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px)); }
 
   .coop-topbar { overflow: visible; }

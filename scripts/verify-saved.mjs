@@ -98,7 +98,7 @@ try {
     return {
       title: element.querySelector('h1')?.textContent,
       visibleTitleRemoved: element.querySelector('h1')?.classList.contains('sr-only'),
-      originalLabel: origin?.querySelector('span')?.textContent.trim(),
+      originalHelperCount: origin?.querySelectorAll(':scope > span').length,
       originalIdea: origin?.querySelector('p')?.textContent.trim(),
       originalIdeaPinned: originPinned,
       cardCount: cards.length,
@@ -111,7 +111,7 @@ try {
       moveControls: element.querySelectorAll('.scrapbook-drag-grip').length,
     }
   })
-  if (scrapbook.title !== 'Scrapbook' || !scrapbook.visibleTitleRemoved || scrapbook.originalLabel !== 'Starting idea' || scrapbook.originalIdea !== originalIdea || !scrapbook.originalIdeaPinned || scrapbook.cardCount !== 3 || !scrapbook.withinViewport || !scrapbook.noHorizontalOverflow || !scrapbook.ideasVisible || !scrapbook.authoredIdeasLead || !scrapbook.contentAwareHeights || !scrapbook.physicalVariation || scrapbook.moveControls !== 3) {
+  if (scrapbook.title !== 'Scrapbook' || !scrapbook.visibleTitleRemoved || scrapbook.originalHelperCount !== 0 || scrapbook.originalIdea !== originalIdea || !scrapbook.originalIdeaPinned || scrapbook.cardCount !== 3 || !scrapbook.withinViewport || !scrapbook.noHorizontalOverflow || !scrapbook.ideasVisible || !scrapbook.authoredIdeasLead || !scrapbook.contentAwareHeights || !scrapbook.physicalVariation || scrapbook.moveControls !== 3) {
     throw new Error(`Scrapbook did not render the saved rail cleanly: ${JSON.stringify(scrapbook)}`)
   }
   await page.click('.scrapbook-card')
@@ -265,6 +265,55 @@ try {
     throw new Error(`Scrapbook order did not persist: ${persistedScrapbookOrder}`)
   }
 
+  await page.evaluate(() => {
+    const session = JSON.parse(localStorage.getItem('change-cards-session-v1'))
+    session.swarm = Object.fromEntries(Array.from({ length: 40 }, (_, index) => {
+      const cardId = index + 1
+      return [cardId, { note: `Saved response for card ${cardId}, kept concise but visible.`, visited: true, updatedAt: cardId }]
+    }))
+    session.dealtCardIds = Array.from({ length: 40 }, (_, index) => index + 1)
+    session.scrapbookOrder = Array.from({ length: 40 }, (_, index) => index + 1)
+    localStorage.setItem('change-cards-session-v1', JSON.stringify(session))
+  })
+  await page.reload({ waitUntil: 'networkidle0' })
+  const fullRail = await page.$eval('.saved-pins', (element) => {
+    const strip = element.querySelector('.saved-pins-scroll')
+    return {
+      pinCount: element.querySelectorAll('.saved-pin').length,
+      count: element.querySelector('.saved-pins-count')?.textContent,
+      horizontallyScrollable: strip.scrollWidth > strip.clientWidth,
+      noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
+    }
+  })
+  if (fullRail.pinCount !== 40 || fullRail.count !== '40' || !fullRail.horizontallyScrollable || !fullRail.noPageOverflow) {
+    throw new Error(`The saved rail does not scale to 40 cards: ${JSON.stringify(fullRail)}`)
+  }
+
+  const sparkCountBeforeFullScrapbook = sparkRequestCount
+  await page.click('.scrapbook-nav-button')
+  await page.waitForFunction(() => document.querySelectorAll('.scrapbook-card').length === 40)
+  const fullScrapbook = await page.$eval('.scrapbook-layer', (element) => {
+    const scroll = element.querySelector('.scrapbook-scroll')
+    const cards = [...element.querySelectorAll('.scrapbook-card')]
+    scroll.scrollTop = scroll.scrollHeight
+    const finalCard = element.querySelector('.scrapbook-card-shell[data-card-id="40"] .scrapbook-card').getBoundingClientRect()
+    return {
+      cardCount: cards.length,
+      spriteIconCount: cards.filter((card) => card.querySelector('.sprite-card-icon')).length,
+      scrollable: scroll.scrollHeight > scroll.clientHeight,
+      noHorizontalOverflow: scroll.scrollWidth <= scroll.clientWidth + 1,
+      finalCardReachable: finalCard.bottom > 0 && finalCard.top < innerHeight,
+    }
+  })
+  if (fullScrapbook.cardCount !== 40 || fullScrapbook.spriteIconCount !== 24 || !fullScrapbook.scrollable || !fullScrapbook.noHorizontalOverflow || !fullScrapbook.finalCardReachable) {
+    throw new Error(`The scrapbook does not scale to 40 cards: ${JSON.stringify(fullScrapbook)}`)
+  }
+  await page.click('.scrapbook-card-shell[data-card-id="40"] .scrapbook-card')
+  await page.waitForSelector('.saved-review-card[data-card-id="40"]')
+  if (sparkRequestCount !== sparkCountBeforeFullScrapbook) throw new Error('Reviewing a newly added saved card requested Sparks')
+  await page.click('.saved-review-close')
+  await page.click('.scrapbook-close')
+
   if (consoleErrors.length) throw new Error(`Browser errors: ${consoleErrors.join(' | ')}`)
   console.log(JSON.stringify({
     savedRailIsExportSurface: true,
@@ -275,6 +324,7 @@ try {
     scrapbookDesktop: true,
     scrapbookMobile: true,
     scrapbookReordering: true,
+    fortyCardSavedSurfaces: true,
     mobileScrapbookCue: true,
     focusRestored: true,
     editPreservesResponse: true,

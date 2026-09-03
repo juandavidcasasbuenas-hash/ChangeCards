@@ -32,6 +32,30 @@ const CARDS = [
   { id: 14, category: 'flexible', label: 'Being flexible', title: 'Prototype It Tomorrow', provocation: 'What could you make tomorrow that would teach you something?' },
   { id: 15, category: 'flexible', label: 'Being flexible', title: 'The Evidence Changes', provocation: 'New evidence contradicts your current approach. How do you pivot?' },
   { id: 16, category: 'flexible', label: 'Being flexible', title: 'Let the Intruder In', provocation: 'A completely unexpected idea appears. How could it change yours?' },
+  { id: 17, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Learn from Nature', provocation: 'What living system already handles a problem like this — and what principle could you borrow?', sparkBrief: 'Suggest relevant organisms, ecosystems or natural processes paired with the specific mechanism worth borrowing.' },
+  { id: 18, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Put It on Trial', provocation: 'Who would prosecute this idea, who would defend it, and what would each expose?', sparkBrief: 'Suggest specific prosecutors, defenders or witnesses and the concrete strength, risk or tension each would expose.' },
+  { id: 19, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Follow the Whole System', provocation: 'Who is affected upstream or downstream but currently missing from the room?', sparkBrief: 'Name specific upstream or downstream people, organisations, communities or non-human actors missing from the current view.' },
+  { id: 20, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Translate It Twice', provocation: 'How would an artist describe this problem? An engineer? What appears between the two?', sparkBrief: 'Every spark must answer all three parts in the compact form “Artist: [lens]; engineer: [lens]; between: [specific synthesis]”, with no more than three words after each label.' },
+  { id: 21, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Invite the Dissenter', provocation: 'Who would fundamentally disagree with this approach — and what might they be right about?', sparkBrief: 'Name plausible dissenters and concise, context-specific objections they may be right about.' },
+  { id: 22, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Swap the Setting', provocation: 'Where does this same human problem appear in a completely different context?', sparkBrief: 'Suggest surprising but genuinely analogous settings, with enough specificity for the shared human problem to be apparent.' },
+  { id: 23, category: 'ingenious', label: 'Being ingenious', title: 'Use Only What Exists', provocation: 'No new people, money, tools or platforms. What could you rearrange?', sparkBrief: 'Point to existing assets, relationships, routines, spaces or materials that could be recombined without adding resources.' },
+  { id: 24, category: 'ingenious', label: 'Being ingenious', title: 'Make It Reversible', provocation: 'How could someone try this fully — and undo it without penalty?', sparkBrief: 'Suggest concrete opt-outs, rollback mechanisms, reversible trials or ways to restore the prior state.' },
+  { id: 25, category: 'ingenious', label: 'Being ingenious', title: 'Turn the Backstage Front', provocation: 'What hidden process could become the visible experience?', sparkBrief: 'Identify specific hidden labour, decisions or processes that could become visible, participatory or valuable.' },
+  { id: 26, category: 'ingenious', label: 'Being ingenious', title: 'Remove the Interface', provocation: 'If there were no app, website, form or meeting, how would this work?', sparkBrief: 'Suggest direct, physical, ambient or person-to-person ways the idea could work without its expected interface.' },
+  { id: 27, category: 'ingenious', label: 'Being ingenious', title: 'Make It Self-Destruct', provocation: 'What should disappear once it has done its job?', sparkBrief: 'Name temporary structures, permissions, steps or artefacts that should deliberately expire after creating value.' },
+  { id: 28, category: 'ingenious', label: 'Being ingenious', title: 'Change the Currency', provocation: 'If nobody could pay with money, what else could they exchange?', sparkBrief: 'Suggest context-relevant non-monetary exchanges such as time, knowledge, access, care, effort or unused capacity.' },
+  { id: 29, category: 'optimistic', label: 'Being optimistic', title: 'Start with Trust', provocation: 'What becomes possible if you design for people to be trusted rather than controlled?', sparkBrief: 'Suggest freedoms, responsibilities or peer mechanisms that become possible when a specific control is removed.' },
+  { id: 30, category: 'optimistic', label: 'Being optimistic', title: 'Find the Joy', provocation: 'What could make this unexpectedly pleasurable to take part in?', sparkBrief: 'Suggest small, context-specific social, sensory or emotional moments that create genuine pleasure rather than superficial gamification.' },
+  { id: 31, category: 'optimistic', label: 'Being optimistic', title: 'Design the Ripple', provocation: 'Who benefits next when the first person succeeds?', sparkBrief: 'Name concrete second-order beneficiaries and the mechanism through which the first person’s success reaches them.' },
+  { id: 32, category: 'optimistic', label: 'Being optimistic', title: 'Make It Spread Itself', provocation: 'Why would one person naturally pass this on to another?', sparkBrief: 'Suggest intrinsic reasons, useful objects, rituals or moments that would make a person naturally share the idea.' },
+  { id: 33, category: 'optimistic', label: 'Being optimistic', title: 'Raise the Floor', provocation: 'How could even the least successful version leave people better off?', sparkBrief: 'Suggest concrete minimum benefits, safeguards or reusable assets that survive even when the main ambition falls short.' },
+  { id: 34, category: 'optimistic', label: 'Being optimistic', title: 'Leave Something Behind', provocation: 'What skill, relationship or confidence remains after the service is gone?', sparkBrief: 'Name durable capabilities, relationships, confidence, knowledge or infrastructure the idea could intentionally leave behind.' },
+  { id: 35, category: 'flexible', label: 'Being flexible', title: 'Keep Two Doors Open', provocation: 'Which decision could you postpone so that two futures remain possible?', sparkBrief: 'Identify specific commitments that can be delayed, staged or made conditional while preserving two credible paths.' },
+  { id: 36, category: 'flexible', label: 'Being flexible', title: 'Make It Modular', provocation: 'What could be separated so one part can change without breaking everything else?', sparkBrief: 'Suggest concrete components, roles, channels or decisions that could become independent modules with clear joins.' },
+  { id: 37, category: 'flexible', label: 'Being flexible', title: 'Rehearse the Failure', provocation: 'Where is this most likely to break — and what should happen next?', sparkBrief: 'Pair plausible, context-specific failure points with concise recovery, fallback or learning responses.' },
+  { id: 38, category: 'flexible', label: 'Being flexible', title: 'Plan the Exit', provocation: 'How could this stop gracefully if it no longer works?', sparkBrief: 'Suggest humane shutdown, handover, migration or transition mechanisms that preserve value and protect affected people.' },
+  { id: 39, category: 'flexible', label: 'Being flexible', title: 'Design for Misuse', provocation: 'How might people use this in a way you never intended — and what could that teach you?', sparkBrief: 'Suggest plausible unintended uses rooted in the idea and the concrete need, behaviour or opportunity each reveals.' },
+  { id: 40, category: 'flexible', label: 'Being flexible', title: 'Move the Boundary', provocation: 'What changes if something currently inside the idea moves outside it — or vice versa?', sparkBrief: 'Identify specific responsibilities, steps, audiences or resources that could move across the idea’s current boundary.' },
 ]
 
 const CARD_ICON_FILES = [
@@ -52,6 +76,8 @@ const CARD_ICON_FILES = [
   '15-the-evidence-changes.png',
   '16-let-the-intruder-in.png',
 ]
+
+const NEW_CARD_ICON_SPRITE = '/icons/change-cards/17-40-doodles.png'
 
 // Curated rather than generated at runtime: the landing page can feel alive
 // immediately, without spending a request before the workshop has even begun.
@@ -90,12 +116,14 @@ const IDEA_EXAMPLES = [
   'A better way for neighbours to share care during a heatwave.',
 ]
 
-const SWARM_CARD_POSITIONS = [
-  [3, 23, -4], [24, 22, 2], [63, 22, -2], [85, 23, 4],
-  [3, 42, 2], [19, 42, -3], [70, 42, 3], [86, 42, -2],
-  [3, 61, -3], [19, 61, 4], [70, 61, -4], [86, 61, 2],
-  [8, 79, 3], [31, 78, -2], [58, 78, 3], [81, 79, -4],
-]
+const DENSE_ROW_TOPS = [1, 19, 62, 80]
+const DENSE_TABLE_CARD_POSITIONS = Array.from({ length: CARDS.length }, (_, index) => {
+  const column = index % 10
+  const row = Math.floor(index / 10)
+  return [15 + column * (72 / 9), DENSE_ROW_TOPS[row]]
+})
+
+const SWARM_CARD_POSITIONS = DENSE_TABLE_CARD_POSITIONS.map(([x, y], index) => [x, y, ((index * 7) % 9) - 4])
 
 const TABLE_CARD_POSITIONS = [
   [16, 3], [26.5, 2], [37, 3], [47.5, 2], [58, 2], [68.5, 3], [79, 2], [89.5, 3],
@@ -103,7 +131,7 @@ const TABLE_CARD_POSITIONS = [
 ]
 
 // A deliberately imperfect, stable set of rotations: physical cards never land perfectly straight.
-const CARD_TILTS = [-2.7, 1.8, -1.1, 2.6, -2.2, 1.3, -3.1, 2.2, -1.7, 2.9, -2.4, 1.5, -3.3, 2.1, -1.3, 3]
+const CARD_TILTS = [-2.7, 1.8, -1.1, 2.6, -2.2, 1.3, -3.1, 2.2, -1.7, 2.9, -2.4, 1.5, -3.3, 2.1, -1.3, 3, 1.1, -2.8, 2.4, -.9, 3.2, -1.8, .7, -2.5, 1.9, -3, 2.7, -1.4, .9, -2.1, 3.1, -1, 2.3, -2.9, 1.6, -.7, 2.8, -1.9, 1.2, -3.2]
 
 function shuffleCards(cards) {
   const shuffled = [...cards]
@@ -182,7 +210,7 @@ async function requestSparks(payload, force = false) {
   const context = JSON.stringify([payload.originalIdea, payload.currentIdea, payload.cardTitle, payload.previousTransformations])
   let signature = 0
   for (let index = 0; index < context.length; index += 1) signature = ((signature * 31) + context.charCodeAt(index)) | 0
-  const key = ['sparks-sol-v3', payload.cardTitle, signature.toString(36)].join('::')
+  const key = ['sparks-luna-v4', payload.cardTitle, signature.toString(36)].join('::')
   let cache = {}
   try { cache = JSON.parse(sessionStorage.getItem('change-cards-cache-v1')) || {} } catch { /* empty cache */ }
   if (!force && cache[key]) return cache[key]
@@ -1021,6 +1049,7 @@ function CoopRound({ workshop, assignment, participantCount, isHost, onSubmit, o
         cardCategory: card.label,
         cardTitle: card.title,
         cardProvocation: card.provocation,
+        cardSparkBrief: card.sparkBrief,
         previousTransformations: [],
       }, force)
       setSparkState({ cardId: card.id, loading: false, sparks, error: null })
@@ -1558,7 +1587,7 @@ function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorde
               key={card.id}
               data-card-id={card.id}
               className={`scrapbook-card-shell category-${card.category} ${draggingId === card.id ? 'is-dragging' : ''} ${dropTargetId === card.id ? 'is-drop-target' : ''}`}
-              style={{ '--scrapbook-tilt': `${CARD_TILTS[card.id - 1] * .55}deg`, '--scrapbook-delay': `${Math.min(index, 8) * 55}ms` }}
+              style={{ '--scrapbook-tilt': `${CARD_TILTS[(card.id - 1) % CARD_TILTS.length] * .55}deg`, '--scrapbook-delay': `${Math.min(index, 8) * 55}ms` }}
               onDragEnter={() => { if (draggingId && draggingId !== card.id) setDropTargetId(card.id) }}
               onDragOver={(event) => { if (draggingId && draggingId !== card.id) event.preventDefault() }}
               onDrop={(event) => {
@@ -1617,7 +1646,6 @@ function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorde
 function OriginalNote({ idea, compact = false, scrapbook = false }) {
   return (
     <aside className={`original-note ${compact ? 'compact' : ''} ${scrapbook ? 'scrapbook-origin' : ''}`}>
-      <span>Starting idea</span>
       <p>{idea}</p>
       <i aria-hidden="true" />
     </aside>
@@ -1727,7 +1755,8 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   }), [notes])
 
   function defaultPosition(index) {
-    const [x, y] = TABLE_CARD_POSITIONS[index % TABLE_CARD_POSITIONS.length]
+    const layout = dealtCardIds.length > TABLE_CARD_POSITIONS.length ? DENSE_TABLE_CARD_POSITIONS : TABLE_CARD_POSITIONS
+    const [x, y] = layout[index % layout.length]
     return { x, y }
   }
 
@@ -1850,6 +1879,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         cardCategory: card.label,
         cardTitle: card.title,
         cardProvocation: card.provocation,
+        cardSparkBrief: card.sparkBrief,
         previousTransformations: noteContext,
       }, force)
       setSparkStates((current) => ({
@@ -1896,7 +1926,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
 
   return (
     <section
-      className={`tabletop ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''}`}
+      className={`tabletop ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''}`}
       aria-label="Change Cards idea table"
       onScroll={(event) => setTableScrolled(event.currentTarget.scrollTop > 32)}
     >
@@ -2348,6 +2378,7 @@ function Evolve({ session, update }) {
         cardCategory: card.label,
         cardTitle: card.title,
         cardProvocation: card.provocation,
+        cardSparkBrief: card.sparkBrief,
         previousTransformations: session.journey.map(({ cardId, cardTitle, provocation, category, title, idea, shift }) => ({
           cardId,
           cardTitle,
@@ -2449,7 +2480,7 @@ function Evolve({ session, update }) {
       <section className="deck-section">
         <div className="deck-heading">
           <div>
-            <p className="eyebrow">{selectedId ? `Card ${String(selectedId).padStart(2, '0')} of 16` : `Change ${step} of ${session.targetSteps}`}</p>
+            <p className="eyebrow">{selectedId ? `Card ${String(selectedId).padStart(2, '0')} of ${CARDS.length}` : `Change ${step} of ${session.targetSteps}`}</p>
             <h1>{selectedId ? 'Write the next version.' : step === 1 ? 'Choose a provocation.' : 'Choose the next card.'}</h1>
             <p className="deck-subtitle">{selectedId ? 'Respond in your own words. Tiny sparks drift below the writing space — take one, combine two, or ignore them.' : step === 1 ? 'Pick a card, then use its provocation to evolve the idea yourself.' : 'Each card should develop the version before it. Contrasting cards have drifted forward as a gentle nudge.'}</p>
           </div>
@@ -2534,13 +2565,29 @@ function ChangeCard({ card, index = 0, selected, disabled, onSelect, children, s
 
 function CardIcon({ id }) {
   const filename = CARD_ICON_FILES[id - 1]
-  if (!filename) return null
+  if (filename) {
+    return (
+      <span
+        className="card-icon supplied-card-icon"
+        data-icon={id}
+        aria-hidden="true"
+        style={{ '--card-icon-image': `url("/icons/change-cards/${filename}")` }}
+      />
+    )
+  }
+  const spriteIndex = id - 17
+  if (spriteIndex < 0 || spriteIndex >= 24) return null
+  const column = spriteIndex % 6
+  const row = Math.floor(spriteIndex / 6)
   return (
     <span
-      className="card-icon supplied-card-icon"
+      className="card-icon supplied-card-icon sprite-card-icon"
       data-icon={id}
       aria-hidden="true"
-      style={{ '--card-icon-image': `url("/icons/change-cards/${filename}")` }}
+      style={{
+        '--card-icon-image': `url("${NEW_CARD_ICON_SPRITE}")`,
+        '--card-icon-position': `${column * 20}% ${row * (100 / 3)}%`,
+      }}
     />
   )
 }
@@ -2845,7 +2892,7 @@ function Swarm({ session, update }) {
     <div className="swarm-workspace">
       <section className="swarm-heading">
         <div>
-          <p className="eyebrow">Open exploration · {usedCount} of 16 cards played</p>
+          <p className="eyebrow">Open exploration · {usedCount} of {CARDS.length} cards played</p>
           <h1>Make a glorious mess.</h1>
           <p>Every card transforms your original idea. Drag what lands. Pin what sticks.</p>
         </div>

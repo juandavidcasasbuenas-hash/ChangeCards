@@ -12,6 +12,7 @@ try {
   await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 })
   const consoleErrors = []
   let sparkRequestCount = 0
+  const sparkPayloads = []
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text())
   })
@@ -23,6 +24,7 @@ try {
       return
     }
     sparkRequestCount += 1
+    sparkPayloads.push(JSON.parse(request.postData() || '{}'))
     request.respond({
       status: 200,
       contentType: 'application/json',
@@ -129,9 +131,10 @@ try {
   await page.waitForSelector('.tabletop')
   const initialTable = await page.$eval('.tabletop', (element) => ({
     originalIdea: element.querySelector('.original-note p')?.textContent,
+    originalIdeaHelperCount: element.querySelectorAll('.original-note > span').length,
     deckCount: element.querySelector('.deck-back > span:last-child')?.textContent,
   }))
-  if (initialTable.originalIdea !== originalIdea || initialTable.deckCount !== '16') throw new Error(`Table did not initialise correctly: ${JSON.stringify(initialTable)}`)
+  if (initialTable.originalIdea !== originalIdea || initialTable.originalIdeaHelperCount !== 0 || initialTable.deckCount !== '40') throw new Error(`Table did not initialise correctly: ${JSON.stringify(initialTable)}`)
 
   await page.click('.deck-stack')
   await page.waitForSelector('.deal-flight-card')
@@ -165,10 +168,18 @@ try {
   await page.waitForSelector('.saved-review', { hidden: true })
 
   await page.click('.deal-all-button')
-  await page.waitForFunction(() => document.querySelectorAll('.tabletop-canvas > .table-card-shell').length === 16)
-  const allCards = await page.$$eval('.tabletop-canvas > .table-card-shell', (cards) => ({
+  await page.waitForFunction(() => document.querySelectorAll('.tabletop-canvas > .table-card-shell').length === 40)
+  const allCards = await page.$$eval('.tabletop-canvas > .table-card-shell', (cards) => {
+    const canvas = cards[0]?.closest('.tabletop-canvas')?.getBoundingClientRect()
+    return {
     count: cards.length,
     unique: new Set(cards.map((card) => card.dataset.cardId)).size,
+    denseLayout: cards[0]?.closest('.tabletop')?.classList.contains('is-dense'),
+    spriteIconCount: cards.filter((card) => card.querySelector('.sprite-card-icon')).length,
+    cardsContained: cards.every((card) => {
+      const rect = card.getBoundingClientRect()
+      return rect.left >= canvas.left - 1 && rect.right <= canvas.right + 1 && rect.top >= canvas.top - 1 && rect.bottom <= canvas.bottom + 1
+    }),
     titlesContained: cards.every((card) => {
       const title = card.querySelector('.card-front strong')
       const face = card.querySelector('.card-front')
@@ -177,13 +188,73 @@ try {
       const faceRect = face.getBoundingClientRect()
       return titleRect.left >= faceRect.left - 1 && titleRect.right <= faceRect.right + 1 && titleRect.top >= faceRect.top - 1 && titleRect.bottom <= faceRect.bottom + 1
     }),
-  }))
-  if (allCards.count !== 16 || allCards.unique !== 16 || !allCards.titlesContained) throw new Error(`Deal all produced a broken deck: ${JSON.stringify(allCards)}`)
+  }
+  })
+  if (allCards.count !== 40 || allCards.unique !== 40 || !allCards.denseLayout || allCards.spriteIconCount !== 24 || !allCards.cardsContained || !allCards.titlesContained) throw new Error(`Deal all produced a broken deck: ${JSON.stringify(allCards)}`)
+
+  const denseBreakpointResults = []
+  for (const width of [1280, 1024, 821]) {
+    await page.setViewport({ width, height: 720, deviceScaleFactor: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    denseBreakpointResults.push(await page.$eval('.tabletop', (table) => {
+      const canvas = table.querySelector('.tabletop-canvas')
+      const canvasRect = canvas.getBoundingClientRect()
+      const cards = [...canvas.querySelectorAll(':scope > .table-card-shell')]
+      return {
+        width: innerWidth,
+        cardCount: cards.length,
+        scrollable: table.scrollHeight > table.clientHeight,
+        horizontalOverflow: table.scrollWidth > table.clientWidth + 1,
+        scrollWidth: table.scrollWidth,
+        clientWidth: table.clientWidth,
+        overflowers: [...table.querySelectorAll('*')].map((child) => {
+          const rect = child.getBoundingClientRect()
+          return { className: String(child.className), left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) }
+        }).filter((child) => child.right > innerWidth + 1 || child.left < -1).slice(0, 6),
+        cardsContained: cards.every((card) => {
+          const rect = card.getBoundingClientRect()
+          return rect.left >= canvasRect.left - 1 && rect.right <= canvasRect.right + 1 && rect.top >= canvasRect.top - 1 && rect.bottom <= canvasRect.bottom + 1
+        }),
+      }
+    }))
+  }
+  if (denseBreakpointResults.some((result) => result.cardCount !== 40 || result.horizontalOverflow || !result.cardsContained)) {
+    throw new Error(`Dense deck breaks at a desktop/tablet boundary: ${JSON.stringify(denseBreakpointResults)}`)
+  }
+
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 })
+  await new Promise((resolve) => setTimeout(resolve, 120))
+
+  const newestTestCardId = dealtCardId === '40' ? '39' : '40'
+  await page.click(`.table-card-shell[data-card-id="${newestTestCardId}"] .card-front`)
+  await page.waitForSelector('.response-editor')
+  await page.waitForFunction(() => document.querySelector('.editor-spark button'), { timeout: 5000 })
+  const newestCardPayload = sparkPayloads.at(-1)
+  if (!newestCardPayload.cardSparkBrief || !['Move the Boundary', 'Design for Misuse'].includes(newestCardPayload.cardTitle)) {
+    throw new Error(`New cards do not send their Spark brief: ${JSON.stringify(newestCardPayload)}`)
+  }
+  await page.click('.surface-close')
 
   await new Promise((resolve) => setTimeout(resolve, 1100))
+  const compactBreakpointResults = []
+  for (const width of [820, 600, 390, 320]) {
+    await page.setViewport({ width, height: 844, deviceScaleFactor: 1 })
+    await page.mouse.move(0, 0)
+    await new Promise((resolve) => setTimeout(resolve, 160))
+    compactBreakpointResults.push(await page.$eval('.tabletop', (table) => ({
+      width: innerWidth,
+      scrollable: table.scrollHeight > table.clientHeight,
+      cardCount: table.querySelectorAll('.tabletop-canvas > .table-card-shell').length,
+      horizontalOverflow: table.scrollWidth > table.clientWidth + 1,
+      bodyHorizontalOverflow: document.body.scrollWidth > innerWidth + 1,
+    })))
+  }
+  if (compactBreakpointResults.some((result) => !result.scrollable || result.cardCount !== 40 || result.horizontalOverflow || result.bodyHorizontalOverflow)) {
+    throw new Error(`Compact full-deck browsing breaks at a responsive boundary: ${JSON.stringify(compactBreakpointResults)}`)
+  }
+
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
-  await page.mouse.move(0, 0)
-  await new Promise((resolve) => setTimeout(resolve, 400))
+  await new Promise((resolve) => setTimeout(resolve, 160))
   const workshopFooter = await page.$eval('.project-credit.is-app-footer', (element) => {
     const footer = element.getBoundingClientRect()
     const items = [...element.children]
@@ -214,7 +285,7 @@ try {
       return { className: child.className, left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) }
     }).filter((child) => child.right > innerWidth + 1 || child.left < -1).slice(0, 8),
   }))
-  if (!mobileTable.scrollable || mobileTable.cardCount !== 16 || mobileTable.horizontalOverflow) {
+  if (!mobileTable.scrollable || mobileTable.cardCount !== 40 || mobileTable.horizontalOverflow) {
     throw new Error(`Mobile table does not expose the full deck cleanly: ${JSON.stringify(mobileTable)}`)
   }
   await page.$eval('.tabletop', (element) => {
@@ -261,6 +332,8 @@ try {
     savedCardReview: true,
     reviewDoesNotGenerate: true,
     dealAllUniqueCards: true,
+    denseDeckBreakpoints: true,
+    compactDeckBreakpoints: true,
     mobileTableScrolls: true,
     mobileWorkshopFooter: true,
     mobilePrivacyContained: true,

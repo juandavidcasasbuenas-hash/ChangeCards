@@ -39,7 +39,7 @@ create table if not exists public.assignments (
   round_number integer not null check (round_number > 0),
   idea_id uuid not null references public.ideas(id) on delete cascade,
   participant_id uuid not null references public.participants(id) on delete cascade,
-  card_id integer not null check (card_id between 1 and 16),
+  card_id integer not null check (card_id between 1 and 40),
   source_text text not null,
   response text check (response is null or char_length(response) between 1 and 1000),
   submitted_at timestamptz,
@@ -234,6 +234,7 @@ declare
   v_idea_count integer;
   v_round integer;
   v_shift integer;
+  v_card_offset integer;
 begin
   select * into v_workshop from public.workshops where id = p_workshop_id for update;
   if not found or v_workshop.host_user_id <> auth.uid() then raise exception 'Only the host can start a round.'; end if;
@@ -247,6 +248,7 @@ begin
 
   v_round := v_workshop.round_number + 1;
   v_shift := 1 + mod(v_round - 1, v_count - 1);
+  v_card_offset := mod(abs(hashtextextended(p_workshop_id::text, v_round)::numeric), 10)::integer;
 
   with people as (
     select p.id as participant_id,
@@ -271,7 +273,12 @@ begin
     v_round,
     pairings.idea_id,
     pairings.participant_id,
-    1 + ((v_round - 1) * 4) + mod((pairings.idea_rn - 1)::integer, 4),
+    case v_round
+      when 1 then (array[1, 2, 3, 4, 17, 18, 19, 20, 21, 22])[1 + mod((pairings.idea_rn - 1 + v_card_offset)::integer, 10)]
+      when 2 then (array[5, 6, 7, 8, 23, 24, 25, 26, 27, 28])[1 + mod((pairings.idea_rn - 1 + v_card_offset)::integer, 10)]
+      when 3 then (array[9, 10, 11, 12, 29, 30, 31, 32, 33, 34])[1 + mod((pairings.idea_rn - 1 + v_card_offset)::integer, 10)]
+      else (array[13, 14, 15, 16, 35, 36, 37, 38, 39, 40])[1 + mod((pairings.idea_rn - 1 + v_card_offset)::integer, 10)]
+    end,
     pairings.body
   from pairings;
 

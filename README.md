@@ -1,6 +1,6 @@
 # Change Cards
 
-A tactile design-thinking card game. Play solo against a deck of 16 provocations, or create a four-round co-op room where ideas circulate and return with four hidden changes.
+A tactile design-thinking card game. Play solo against a deck of 40 provocations, or create a four-round co-op room where ideas circulate and return with four hidden changes.
 
 ## Run locally
 
@@ -49,4 +49,4 @@ Co-op rooms accept new players only in the lobby and have no application-level p
 
 ## Verification
 
-With the production server already running, `npm run verify` checks the solo entry flow, all 16 cards, Spark generation, saving and reviewing ideas, responsive card access, and browser errors. It uses the local Google Chrome installation and makes one mocked Spark request. Co-op requires a configured Supabase project for end-to-end verification.
+With the production server already running, `npm run verify` checks the solo entry flow, all 40 cards, Spark generation, saving and reviewing ideas, responsive card access, and browser errors. It uses the local Google Chrome installation and makes one mocked Spark request. Co-op requires a configured Supabase project for end-to-end verification.
