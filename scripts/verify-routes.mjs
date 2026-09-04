@@ -102,6 +102,20 @@ try {
   if (new Set(routeFromPartialDeck.routePositions.map(({ left, top }) => `${left}/${top}`)).size !== 4) {
     throw new Error(`Route cards did not land in four positions: ${JSON.stringify(routeFromPartialDeck.routePositions)}`)
   }
+  const routeRibbonLayout = await page.$eval('.tabletop', (table) => {
+    const ribbon = table.querySelector('.route-ribbon')?.getBoundingClientRect()
+    const routeCards = [...table.querySelectorAll('.table-card-shell.is-route-card')].map((card) => {
+      const rect = card.getBoundingClientRect()
+      return { id: card.dataset.cardId, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+    })
+    const overlaps = routeCards.filter((card) => (
+      ribbon && card.left < ribbon.right && card.right > ribbon.left && card.top < ribbon.bottom && card.bottom > ribbon.top
+    )).map((card) => card.id)
+    return { ribbon: ribbon && { left: ribbon.left, top: ribbon.top, right: ribbon.right, bottom: ribbon.bottom }, overlaps }
+  })
+  if (routeRibbonLayout.overlaps.length) {
+    throw new Error(`Route progress obscures route cards: ${JSON.stringify(routeRibbonLayout)}`)
+  }
 
   await page.click('.table-card-shell[data-card-id="13"] .card-front')
   await page.waitForSelector('.response-editor')

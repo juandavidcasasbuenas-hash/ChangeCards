@@ -1564,6 +1564,36 @@ function ScrapbookIcon() {
   )
 }
 
+function DealAllIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="7" width="5.5" height="10" rx="1.1" transform="rotate(-6 4.75 12)" />
+      <rect x="9.25" y="5" width="5.5" height="10" rx="1.1" />
+      <rect x="16.5" y="7" width="5.5" height="10" rx="1.1" transform="rotate(6 19.25 12)" />
+    </svg>
+  )
+}
+
+function ReturnCardsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="9" y="7" width="9" height="12" rx="1.5" transform="rotate(4 13.5 13)" />
+      <path d="M7.5 16.5C4.3 15.6 3.2 11.8 5.2 9M5.2 9l.2 3.7M5.2 9l3.5 1.2" />
+    </svg>
+  )
+}
+
+function RouteIcon() {
+  return (
+    <svg className="route-button-icon" viewBox="0 0 30 20" aria-hidden="true">
+      <path d="M7.5 6.2c3.2 0 3.2 6.7 7.5 6.7s4.3-6.7 7.5-6.7" />
+      <rect x="1.5" y="2" width="7" height="9" rx="1" transform="rotate(-5 5 6.5)" />
+      <rect x="11.5" y="8.5" width="7" height="9" rx="1" transform="rotate(3 15 13)" />
+      <rect x="21.5" y="2" width="7" height="9" rx="1" transform="rotate(5 25 6.5)" />
+    </svg>
+  )
+}
+
 function RouteNavStatus({ route, notes, onExit }) {
   const completedCount = route.cardIds.filter((cardId) => notes[cardId]?.visited).length
   return (
@@ -2301,28 +2331,33 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         )}
         {(dragOverDeck || !remainingCards.length) && <p>{dragOverDeck ? 'Drop to return it' : 'All cards dealt'}</p>}
         <div className="deal-controls">
-          <button className="deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>Deal all</button>
+          <button className="deck-control-button deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>
+            <span className="deck-control-icon is-deal"><DealAllIcon /></span>
+            <span className="deck-control-label">Deal all</span>
+          </button>
           {hasUnusedDealtCards && (
             <button
-              className="clear-unused-button"
+              className="deck-control-button clear-unused-button"
               type="button"
               onClick={clearUnused}
               disabled={Boolean(dealFlight)}
               aria-label="Return every unused card to the deck"
             >
-              Clear unused
+              <span className="deck-control-icon is-return"><ReturnCardsIcon /></span>
+              <span className="deck-control-label">Clear unused</span>
             </button>
           )}
           <button
             ref={routesButtonRef}
-            className={`routes-button ${routesOpen ? 'is-open' : ''}`}
+            className={`deck-control-button routes-button ${routesOpen ? 'is-open' : ''}`}
             type="button"
             aria-expanded={routesOpen}
             aria-controls="curated-routes"
             disabled={Boolean(dealFlight)}
             onClick={() => setRoutesOpen((open) => !open)}
           >
-            Routes
+            <span className="deck-control-icon is-route"><RouteIcon /></span>
+            <span className="deck-control-label">Routes</span>
           </button>
         </div>
       </aside>
