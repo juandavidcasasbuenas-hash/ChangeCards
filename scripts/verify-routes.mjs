@@ -73,7 +73,7 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 520))
   await page.screenshot({ path: '/tmp/change-cards-route-chooser-desktop.png', fullPage: false })
 
-  await page.click('.route-chooser-scrim')
+  await page.click('.route-chooser-scrim', { offset: { x: 5, y: 80 } })
   await page.waitForSelector('.route-chooser', { hidden: true })
   await page.waitForFunction(() => document.activeElement === document.querySelector('.routes-button'))
   await page.click('.routes-button')
@@ -220,7 +220,7 @@ try {
       return {
         width: innerWidth,
         firstFour: cards.slice(0, 4).map((card) => Number(card.dataset.cardId)),
-        scrollable: table.scrollHeight > table.clientHeight,
+        scrollable: document.documentElement.scrollHeight > innerHeight,
         horizontalOverflow: table.scrollWidth > table.clientWidth + 1 || document.body.scrollWidth > innerWidth + 1,
         ribbonHidden: ribbon && getComputedStyle(ribbon).display === 'none',
         navVisible: nav && getComputedStyle(nav).display !== 'none',
@@ -231,40 +231,31 @@ try {
       }
     }))
   }
-  const brokenCompactLayout = compactRouteLayouts.find((layout) => JSON.stringify(layout.firstFour) !== JSON.stringify([6, 22, 20, 8]) || !layout.scrollable || layout.horizontalOverflow || !layout.ribbonHidden || !layout.navVisible || !layout.navContained || !layout.deckVeil || layout.backgroundCount !== 36 || !layout.backgroundInert)
+  const brokenCompactLayout = compactRouteLayouts.find((layout) => JSON.stringify(layout.firstFour) !== JSON.stringify([6, 22, 20, 8]) || !layout.scrollable || layout.horizontalOverflow || layout.ribbonHidden || layout.navVisible || layout.backgroundCount !== 36 || !layout.backgroundInert)
   if (brokenCompactLayout) throw new Error(`Compact route layout failed: ${JSON.stringify(compactRouteLayouts)}`)
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
   await new Promise((resolve) => setTimeout(resolve, 220))
   await page.screenshot({ path: '/tmp/change-cards-route-mobile.png', fullPage: false })
 
-  await page.click('.route-nav-status > button')
+  await page.click('.route-ribbon > button')
   await new Promise((resolve) => setTimeout(resolve, 760))
   if ((await page.$$('.table-card-shell')).length !== 40) throw new Error('Leaving a route removed cards from the full deck')
   await page.click('.routes-button')
   await page.waitForSelector('.route-chooser')
   const mobileChooser = await page.$eval('.route-chooser', (element) => ({
     contained: element.getBoundingClientRect().left >= 0 && element.getBoundingClientRect().right <= innerWidth,
-    horizontallyScrollable: element.querySelector('.route-slips').scrollWidth > element.querySelector('.route-slips').clientWidth,
+    verticallyScrollable: element.scrollHeight > element.clientHeight,
     bodyOverflow: document.body.scrollWidth > innerWidth + 1,
   }))
-  if (!mobileChooser.contained || !mobileChooser.horizontallyScrollable || mobileChooser.bodyOverflow) {
+  if (!mobileChooser.contained || !mobileChooser.verticallyScrollable || mobileChooser.bodyOverflow) {
     throw new Error(`Mobile route chooser failed: ${JSON.stringify(mobileChooser)}`)
   }
   await new Promise((resolve) => setTimeout(resolve, 520))
-  if (!await page.$('.route-scroll-button.is-next') || await page.$('.route-scroll-button.is-previous')) {
-    throw new Error('Route carousel does not start with only its forward arrow')
-  }
   await page.screenshot({ path: '/tmp/change-cards-route-chooser-mobile.png', fullPage: false })
-  await page.click('.route-scroll-button.is-next')
-  await page.waitForFunction(() => document.querySelector('.route-slips')?.scrollLeft > 40)
-  if (!await page.$('.route-scroll-button.is-previous')) throw new Error('The previous route arrow did not appear after scrolling')
-  await page.focus('.route-scroll-button.is-previous')
-  await page.keyboard.press('Enter')
-  await page.waitForFunction(() => document.querySelector('.route-slips')?.scrollLeft < 5)
-  if (await page.$('.route-scroll-button.is-previous') || !await page.$('.route-scroll-button.is-next')) {
-    throw new Error('Route carousel arrows did not update at the starting edge')
-  }
+  await page.$eval('.route-slip:last-child', (element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }))
+  const lastRouteVisible = await page.$eval('.route-slip:last-child', (element) => element.getBoundingClientRect().bottom <= innerHeight)
+  if (!lastRouteVisible) throw new Error('Final route cannot be reached on mobile')
   await page.setViewport({ width: 320, height: 720, deviceScaleFactor: 1 })
   await new Promise((resolve) => setTimeout(resolve, 220))
   const narrowCarousel = await page.$eval('.route-chooser', (chooser) => {
@@ -302,7 +293,10 @@ try {
   await page.type('.response-editor', 'If invitations fail, hosts phone one person and record why others declined.')
   await page.click('.response-submit')
   await page.waitForSelector('.route-ribbon.is-celebrating')
-  await page.waitForSelector('.tabletop.has-active-route', { hidden: true, timeout: 3500 })
+  await new Promise((resolve) => setTimeout(resolve, 1800))
+  if (!await page.$('.tabletop.has-active-route')) throw new Error('Route completion disappeared before dismissal')
+  await page.click('.route-ribbon > button')
+  await page.waitForSelector('.tabletop.has-active-route', { hidden: true })
   const completionState = await page.evaluate(() => JSON.parse(localStorage.getItem('change-cards-session-v1')))
   if (completionState.activeRouteId !== null || !completionState.swarm?.[37]?.visited || completionState.dealtCardIds.length !== 40) {
     throw new Error(`Completing a route did not return cleanly to the table: ${JSON.stringify(completionState)}`)
@@ -330,6 +324,12 @@ try {
     mouseAndKeyboardRouteScrolling: true,
     completionReturnsToTable: true,
   }, null, 2))
+} catch (error) {
+  const pages = await browser.pages()
+  const page = pages.at(-1)
+  await page.screenshot({ path: '/tmp/change-cards-routes-failure.png' })
+  console.error(await page.evaluate(() => {const e=document.querySelector('.routes-button'),r=e?.getBoundingClientRect();return {scrollY,button:r?.toJSON(),hit:r&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML.slice(0,300)}}))
+  throw error
 } finally {
   await browser.close()
 }

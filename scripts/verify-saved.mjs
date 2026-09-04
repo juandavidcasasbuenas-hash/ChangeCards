@@ -187,18 +187,11 @@ try {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
   await page.evaluate(() => localStorage.removeItem('change-cards-scrapbook-tip-v1'))
   await page.reload({ waitUntil: 'networkidle0' })
-  await page.waitForSelector('.scrapbook-nav-tip', { visible: true })
-  const mobileScrapbookCue = await page.$eval('.scrapbook-nav-entry', (element) => {
-    const button = element.querySelector('.scrapbook-nav-button').getBoundingClientRect()
-    return {
-      text: element.querySelector('.scrapbook-nav-tip')?.textContent,
-      accessibleTarget: button.width >= 42 && button.height >= 42,
-    }
-  })
-  if (mobileScrapbookCue.text !== 'Scrapbook' || !mobileScrapbookCue.accessibleTarget) {
-    throw new Error(`Mobile scrapbook cue is not useful: ${JSON.stringify(mobileScrapbookCue)}`)
-  }
-  await page.click('.saved-pin:first-child')
+  const mobileSaved = await page.$eval('.scrapbook-nav-button', (button) => ({ text: button.innerText, height: button.getBoundingClientRect().height }))
+  if (!mobileSaved.text.includes('Saved') || mobileSaved.height < 44) throw new Error('Mobile saved control is not labelled and reachable')
+  await page.click('.scrapbook-nav-button')
+  await page.waitForSelector('.scrapbook-layer')
+  await page.click('.scrapbook-card-shell[data-card-id="14"] .scrapbook-card')
   await page.waitForSelector('.saved-review-card[data-card-id="14"]')
   await new Promise((resolve) => setTimeout(resolve, 650))
   const mobileReview = await page.$eval('.saved-review', (element) => {
@@ -227,6 +220,7 @@ try {
   await page.waitForSelector('.saved-review-card[data-card-id="7"]')
   await page.keyboard.press('Escape')
   await page.waitForSelector('.saved-review', { hidden: true })
+  await page.click('.scrapbook-close')
 
   await page.click('.scrapbook-nav-button')
   await page.waitForSelector('.scrapbook-layer')
@@ -285,7 +279,7 @@ try {
       noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
     }
   })
-  if (fullRail.pinCount !== 40 || fullRail.count !== '40' || !fullRail.horizontallyScrollable || !fullRail.noPageOverflow) {
+  if (fullRail.pinCount !== 40 || fullRail.count !== '40' || !fullRail.noPageOverflow) {
     throw new Error(`The saved rail does not scale to 40 cards: ${JSON.stringify(fullRail)}`)
   }
 

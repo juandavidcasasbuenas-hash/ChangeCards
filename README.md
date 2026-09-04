@@ -49,4 +49,12 @@ Co-op rooms accept new players only in the lobby and have no application-level p
 
 ## Verification
 
-With the production server already running, `npm run verify` checks the solo entry flow, all 40 cards, Spark generation, saving and reviewing ideas, responsive card access, and browser errors. It uses the local Google Chrome installation and makes one mocked Spark request. Co-op requires a configured Supabase project for end-to-end verification.
+With the production server already running, `npm run verify` checks the solo entry flow, all 40 cards, Spark generation, saving and reviewing ideas, responsive card access, and browser errors. It uses the local Google Chrome installation with mocked Spark requests. Co-op requires a configured Supabase project for end-to-end verification.
+
+## Workshop UX verification
+
+Solo card drafts are kept in the current browser and restored after closing a card or reloading. The logo returns to a resumable home screen; **New idea** asks before clearing the table and offers a text download of saved ideas and unfinished drafts. **Deal all 40** groups cards by thinking style and arranges them around the starting note on the canvas. Guided routes remain visible after completion until the player finishes the route.
+
+With the production build served on port 8787, `npm run verify:ux` exercises draft recovery, home/reset/export, responsive layouts, saved-idea copying, route completion, and AI loading/failure/retry and restored rotating sparks. It mocks AI requests and saves screenshots under `output/ux-improvements/`. Set `VERIFY_ORIGIN` to check another local server.
+
+`npm run verify:coop:live` is an **explicit live integration check**. It creates an isolated two-player Supabase room, completes four passes and verifies both reveals. AI requests are mocked and no invitations are sent. Like other co-op rooms, its records remain in Supabase until deleted by the operator. It is intentionally separate from the default verification command.

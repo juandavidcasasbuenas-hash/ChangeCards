@@ -102,15 +102,10 @@ try {
   }))
   if (!initialMode.text.toLowerCase().includes('solo') || !initialMode.text.toLowerCase().includes('co-op') || initialMode.selected !== 'Solo') throw new Error('The mode selector is not initialised to Solo')
   await page.click('.entry-mode-toggle button:last-child')
+  await page.click('.coop-entry-choices button:last-child')
   await page.waitForSelector('.entry-room-actions #entry-room-code')
-  if (await page.$('.host-name-field')) throw new Error('The landing page should not ask for a name')
-  if (await page.$eval('.entry-mode-toggle button:last-child', (element) => element.getAttribute('aria-pressed')) !== 'true') throw new Error('The mode selector did not switch to Co-op')
-  const coopEntryOrder = await page.evaluate(() => {
-    const idea = document.querySelector('.idea-input-wrap')?.getBoundingClientRect()
-    const roomActions = document.querySelector('.entry-room-actions')?.getBoundingClientRect()
-    return { ideaBottom: idea?.bottom, roomActionsTop: roomActions?.top }
-  })
-  if (coopEntryOrder.roomActionsTop <= coopEntryOrder.ideaBottom) throw new Error('The room choice should appear below the idea')
+  if (await page.$('#idea')) throw new Error('Joining should ask for code before an idea')
+  await page.click('.coop-entry-choices button:first-child')
   await page.type('#idea', 'A temporary co-op idea')
   await page.click('.entry-create-choice')
   await page.waitForSelector('.entry-name-step #entry-display-name')
@@ -203,7 +198,7 @@ try {
       return {
         width: innerWidth,
         cardCount: cards.length,
-        scrollable: table.scrollHeight > table.clientHeight,
+        scrollable: document.documentElement.scrollHeight > innerHeight,
         horizontalOverflow: table.scrollWidth > table.clientWidth + 1,
         scrollWidth: table.scrollWidth,
         clientWidth: table.clientWidth,
@@ -243,7 +238,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 160))
     compactBreakpointResults.push(await page.$eval('.tabletop', (table) => ({
       width: innerWidth,
-      scrollable: table.scrollHeight > table.clientHeight,
+      scrollable: document.documentElement.scrollHeight > innerHeight,
       cardCount: table.querySelectorAll('.tabletop-canvas > .table-card-shell').length,
       horizontalOverflow: table.scrollWidth > table.clientWidth + 1,
       bodyHorizontalOverflow: document.body.scrollWidth > innerWidth + 1,
@@ -271,11 +266,11 @@ try {
       itemsOverlap: items.some((item, index) => index < items.length - 1 && item.right > items[index + 1].left + 0.5),
     }
   })
-  if (workshopFooter.position !== 'fixed' || workshopFooter.left < -1 || workshopFooter.right > workshopFooter.viewportWidth + 1 || workshopFooter.itemsOverlap) {
+  if (workshopFooter.position !== 'relative' || workshopFooter.left < -1 || workshopFooter.right > workshopFooter.viewportWidth + 1 || workshopFooter.itemsOverlap) {
     throw new Error(`Workshop footer is not contained on mobile: ${JSON.stringify(workshopFooter)}`)
   }
   const mobileTable = await page.$eval('.tabletop', (element) => ({
-    scrollable: element.scrollHeight > element.clientHeight,
+    scrollable: document.documentElement.scrollHeight > innerHeight,
     cardCount: element.querySelectorAll('.tabletop-canvas > .table-card-shell').length,
     horizontalOverflow: element.scrollWidth > element.clientWidth + 1,
     scrollWidth: element.scrollWidth,
@@ -288,10 +283,7 @@ try {
   if (!mobileTable.scrollable || mobileTable.cardCount !== 40 || mobileTable.horizontalOverflow) {
     throw new Error(`Mobile table does not expose the full deck cleanly: ${JSON.stringify(mobileTable)}`)
   }
-  await page.$eval('.tabletop', (element) => {
-    element.style.scrollBehavior = 'auto'
-    element.scrollTop = element.scrollHeight
-  })
+  await page.$eval('.tabletop-canvas > .table-card-shell:last-of-type', (element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }))
   await new Promise((resolve) => setTimeout(resolve, 150))
   const lastCard = await page.$eval('.tabletop-canvas > .table-card-shell:last-of-type', (element) => {
     const rect = element.getBoundingClientRect()

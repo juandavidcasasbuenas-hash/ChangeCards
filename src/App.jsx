@@ -216,6 +216,7 @@ const DEFAULT_SESSION = {
   cardPositions: {},
   scrapbookOrder: [],
   activeRouteId: null,
+  drafts: {},
 }
 
 function loadSession() {
@@ -318,6 +319,10 @@ function App() {
   const [activeCard, setActiveCard] = useState(null)
   const [scrapbookOpen, setScrapbookOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [homeOpen, setHomeOpen] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [storageError, setStorageError] = useState(false)
+  const storageErrorRef = useRef(false)
   const [copyFeedback, setCopyFeedback] = useState({ key: null, message: '' })
   const activeTriggerRef = useRef(null)
   const scrapbookTriggerRef = useRef(null)
@@ -326,19 +331,39 @@ function App() {
   const analyticsEnabled = !['localhost', '127.0.0.1'].includes(window.location.hostname)
 
   useEffect(() => {
-    localStorage.setItem('change-cards-session-v1', JSON.stringify(session))
+    try {
+      localStorage.setItem('change-cards-session-v1', JSON.stringify(session))
+      if (storageErrorRef.current) { storageErrorRef.current = false; setStorageError(false) }
+    } catch {
+      if (!storageErrorRef.current) { storageErrorRef.current = true; setStorageError(true) }
+    }
   }, [session])
 
   useEffect(() => () => window.clearTimeout(copyTimerRef.current), [])
 
-  const update = (patch) => setSession((current) => ({ ...current, ...patch }))
+  const update = (patch) => setSession((current) => ({ ...current, ...(typeof patch === 'function' ? patch(current) : patch) }))
 
   const startAgain = () => {
     const next = { ...DEFAULT_SESSION }
     setActiveCard(null)
     setScrapbookOpen(false)
     setSession(next)
-    sessionStorage.removeItem('change-cards-cache-v1')
+    setResetOpen(false)
+    setHomeOpen(false)
+    try { sessionStorage.removeItem('change-cards-cache-v1') } catch { /* cache is optional */ }
+  }
+
+  const requestRestart = () => setResetOpen(true)
+  const goHome = () => { setActiveCard(null); setScrapbookOpen(false); setHomeOpen(true) }
+  const downloadSession = () => {
+    const draftText = CARDS.filter((card) => session.drafts?.[card.id]?.trim()).map((card) => `DRAFT — ${card.title}\n${session.drafts[card.id]}`).join('\n\n')
+    const content = `${formatAllSavedIdeas(session.idea, session.swarm)}${draftText ? `\n\nUnfinished drafts\n\n${draftText}` : ''}`
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'change-cards-ideas.txt'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   const openCard = (cardId, mode, trigger) => {
@@ -401,6 +426,8 @@ function App() {
   const withPrivacy = (page) => (
     <>
       {page}
+      <ResetSessionDialog open={resetOpen} onCancel={() => setResetOpen(false)} onConfirm={startAgain} onDownload={downloadSession} />
+      {storageError && <p className="storage-error" role="alert">This browser couldn’t save your work. Keep this tab open and copy your ideas before leaving.</p>}
       <PrivacyNotice open={privacyOpen} onClose={closePrivacy} />
       {analyticsEnabled && <Analytics />}
     </>
@@ -415,8 +442,8 @@ function App() {
     )
   }
 
-  if (session.stage === 'intro' || !session.idea) {
-    return withPrivacy(<Entry session={session} update={update} onEnterRoom={enterRoom} onOpenPrivacy={openPrivacy} />)
+  if (homeOpen || session.stage === 'intro' || !session.idea) {
+    return withPrivacy(<Entry key={session.idea} session={session} update={update} onResume={() => setHomeOpen(false)} onNew={requestRestart} onEnterRoom={enterRoom} onOpenPrivacy={openPrivacy} />)
   }
 
   const scrapbookOrder = session.scrapbookOrder || []
@@ -447,7 +474,8 @@ function App() {
   return withPrivacy(
     <main className="app-shell mode-tabletop">
       <TopBar
-        onRestart={startAgain}
+        onRestart={requestRestart}
+        onHome={goHome}
         savedCards={savedCards}
         activeRoute={activeRoute}
         routeNotes={session.swarm || {}}
@@ -466,6 +494,8 @@ function App() {
           onClose={closeScrapbook}
           onOpenCard={(cardId, trigger) => openCard(cardId, 'review', trigger)}
           onReorder={reorderScrapbookCard}
+          onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
+          copied={copyFeedback.key === 'all'}
         />
       )}
       <Tabletop
@@ -477,6 +507,11 @@ function App() {
         closeCard={closeCard}
         setActiveCard={setActiveCard}
         copyFeedback={copyFeedback}
+        onSaved={() => {
+          window.clearTimeout(copyTimerRef.current)
+          setCopyFeedback({ key: 'saved', message: 'Idea saved to your scrapbook.' })
+          copyTimerRef.current = window.setTimeout(() => setCopyFeedback({ key: null, message: '' }), 2600)
+        }}
         onCopyIdea={(card, note) => copyWithFeedback(`card-${card.id}`, formatSavedIdea(card, note), `${card.title} copied.`)}
       />
       {copyFeedback.message && (
@@ -489,12 +524,34 @@ function App() {
   )
 }
 
-function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
+function ResetSessionDialog({ open, onCancel, onConfirm, onDownload }) {
+  const dialogRef = useRef(null)
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+  return (
+    <dialog ref={dialogRef} className="reset-session-dialog" aria-labelledby="reset-session-title" onCancel={(event) => { event.preventDefault(); onCancel() }}>
+      <p className="eyebrow">Before you clear the table</p>
+      <h2 id="reset-session-title">Make room for a new idea?</h2>
+      <p>This removes your current table, saved ideas and unfinished drafts from this browser. Download a copy if you’d like to keep them.</p>
+      <button className="export-session-button" type="button" onClick={onDownload}>↓ Download ideas & drafts</button>
+      <div className="reset-session-actions"><button className="text-button" type="button" autoFocus onClick={onCancel}>Keep my table</button><button className="ink-button" type="button" onClick={onConfirm}>Clear & start new</button></div>
+    </dialog>
+  )
+}
+
+function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy }) {
   const [draft, setDraft] = useState(session.idea)
   const [playMode, setPlayMode] = useState('solo')
   const [roomCodeDraft, setRoomCodeDraft] = useState('')
   const [displayName, setDisplayName] = useState(() => localStorage.getItem('change-cards-coop-display-name') || '')
   const [coopPath, setCoopPath] = useState(null)
+  const [coopChoice, setCoopChoice] = useState('create')
+  const canResume = session.stage === 'play' && Boolean(session.idea)
+  const savedCount = Object.values(session.swarm || {}).filter((note) => note.visited).length
+  const draftCount = Object.values(session.drafts || {}).filter((draft) => draft?.trim()).length
   const [creatingRoom, setCreatingRoom] = useState(false)
   const [joiningRoom, setJoiningRoom] = useState(false)
   const [entryError, setEntryError] = useState('')
@@ -507,12 +564,8 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
       setEntryError('Room codes are six characters. Check the code and try again.')
       return
     }
-    if (!draft.trim()) {
-      setEntryError('Add what you’re working on before joining.')
-      return
-    }
     if (!isCoopConfigured) {
-      setEntryError('Co-op needs the Supabase project URL and publishable key in .env.')
+      setEntryError('Co-op is unavailable right now. You can still explore on your own.')
       return
     }
     setCoopPath('join')
@@ -533,7 +586,6 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
       const room = isJoining
         ? await joinWorkshop({ code: roomCodeDraft.trim().toUpperCase(), displayName: displayName.trim() })
         : await createWorkshop({ displayName: displayName.trim(), idea: draft.trim() })
-      if (isJoining) await saveWorkshopIdea({ workshopId: room.workshop_id, idea: draft.trim() })
       localStorage.setItem('change-cards-coop-display-name', displayName.trim())
       localStorage.setItem(`change-cards-coop-name-${room.code}`, displayName.trim())
       onEnterRoom(room.code)
@@ -555,7 +607,7 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
         return
       }
       if (!isCoopConfigured) {
-        setEntryError('Co-op needs the Supabase project URL and publishable key in .env.')
+        setEntryError('Co-op is unavailable right now. You can still explore on your own.')
         return
       }
       setCoopPath('create')
@@ -573,6 +625,7 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
       swarm: {},
       scrapbookOrder: [],
       activeRouteId: null,
+      drafts: {},
     })
   }
 
@@ -625,6 +678,7 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
       <section className="entry-content">
         <div className="entry-copy">
           <h1>Push an idea<br /><em>somewhere unexpected.</em></h1>
+          <p className="entry-description">Use 40 creative prompts to explore new directions. Pick a card, change one detail, save the idea.</p>
         </div>
 
         <form className="idea-form" onSubmit={submit}>
@@ -648,50 +702,49 @@ function Entry({ session, update, onEnterRoom, onOpenPrivacy }) {
                 Co-op
               </button>
             </div>
-            <p className="entry-mode-context" aria-live="polite">
-              {playMode === 'solo' ? 'Explore at your own pace.' : 'Pass ideas around a shared, timed room.'}
-            </p>
           </fieldset>
-          <label htmlFor="idea">What are you working on?</label>
-          <div className="idea-input-wrap">
-            <textarea
-              id="idea"
-              value={draft}
-              maxLength={1000}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder={ideaExample}
-              aria-describedby="idea-example-description"
-              autoFocus
-            />
-            <span id="idea-example-description" className="sr-only">Enter your own idea in any field or discipline.</span>
-            {draft && <span className="character-count">{draft.length} / 1000</span>}
-          </div>
           {playMode === 'coop' && (
+            <div className="coop-entry-choices" role="group" aria-label="Host or join">
+              <button type="button" aria-pressed={coopChoice === 'create'} onClick={() => { setCoopChoice('create'); setEntryError('') }}>Host a room</button>
+              <button type="button" aria-pressed={coopChoice === 'join'} onClick={() => { setCoopChoice('join'); setEntryError('') }}>Join a room</button>
+            </div>
+          )}
+          {canResume && playMode === 'solo' ? (
+            <section className="resume-session" aria-label="Your saved table">
+              <p className="eyebrow">Your table is still here</p>
+              <h2>{session.idea}</h2>
+              <p>{savedCount} saved {savedCount === 1 ? 'idea' : 'ideas'} · {draftCount} unfinished {draftCount === 1 ? 'draft' : 'drafts'}</p>
+              <button className="ink-button" type="button" onClick={onResume}>Return to my table →</button>
+              <button className="text-button" type="button" onClick={onNew}>Start a new idea</button>
+            </section>
+          ) : playMode === 'coop' && coopChoice === 'join' ? (
             <fieldset className="entry-room-actions">
-              <legend className="sr-only">Choose how to enter co-op</legend>
+              <legend>Have an invitation?</legend>
+              <p>Enter your six-character room code. You’ll add your idea once you’re in.</p>
               <div className="entry-join-choice">
                 <label className="sr-only" htmlFor="entry-room-code">Room code</label>
-                <input
-                  id="entry-room-code"
-                  type="text"
-                  value={roomCodeDraft}
-                  maxLength={6}
+                <input id="entry-room-code" type="text" value={roomCodeDraft} maxLength={6}
                   onChange={(event) => setRoomCodeDraft(event.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ''))}
                   onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); beginJoiningRoom() } }}
-                  placeholder="Room code"
-                  aria-label="Room code"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck="false"
-                />
-                <button type="button" onClick={beginJoiningRoom} disabled={roomCodeDraft.length !== 6}>Join room</button>
+                  placeholder="e.g. ABC234" autoComplete="off" autoCapitalize="characters" spellCheck="false" />
+                <button type="button" onClick={beginJoiningRoom} disabled={roomCodeDraft.length !== 6}>Join room →</button>
               </div>
-              <span className="entry-room-or">or</span>
-              <button className="entry-create-choice" type="submit">Create room</button>
             </fieldset>
+          ) : (
+            <>
+              <label htmlFor="idea">What are you working on?</label>
+              <div className="idea-input-wrap">
+                <textarea id="idea" value={draft} maxLength={1000} onChange={(event) => setDraft(event.target.value)}
+                  placeholder="An idea, a challenge, or something you’d like to change…" aria-describedby="idea-example-description" />
+                <span id="idea-example-description" className="sr-only">Use Try an example if you need a starting point.</span>
+                {draft && <span className="character-count">{draft.length} / 1000</span>}
+              </div>
+              <div className="entry-input-help"><button type="button" className="try-example" onClick={() => setDraft(ideaExample)}>Try an example ↗</button></div>
+              {playMode === 'coop' && <button className="ink-button entry-create-choice" type="submit">Create room →</button>}
+            </>
           )}
           {entryError && <p className="entry-error" role="alert">{entryError}</p>}
-          {playMode === 'solo' && (
+          {playMode === 'solo' && !canResume && (
             <button className="ink-button" type="submit" disabled={!draft.trim()}>
               Start solo
             </button>
@@ -1067,10 +1120,10 @@ function CoopRouteSelector({ route, isHost, busy, onSelect }) {
       if (!controls.length) return
       const first = controls[0]
       const last = controls.at(-1)
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
         event.preventDefault()
         last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) {
         event.preventDefault()
         first.focus()
       }
@@ -1564,6 +1617,15 @@ function ScrapbookIcon() {
   )
 }
 
+function DrawCardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6.5" y="3.5" width="11" height="17" rx="1.7" transform="rotate(-7 12 12)" />
+      <path d="m12 8 1.2 2.8L16 12l-2.8 1.2L12 16l-1.2-2.8L8 12l2.8-1.2Z" />
+    </svg>
+  )
+}
+
 function DealAllIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1614,7 +1676,7 @@ function RouteNavStatus({ route, notes, onExit }) {
   )
 }
 
-function TopBar({ onRestart, savedCards, activeRoute, routeNotes, onExitRoute, onOpenSaved, onOpenScrapbook, onCopyAll, copied }) {
+function TopBar({ onRestart, onHome, savedCards, activeRoute, routeNotes, onExitRoute, onOpenSaved, onOpenScrapbook, onCopyAll, copied }) {
   const [showScrapbookTip, setShowScrapbookTip] = useState(() => {
     try {
       return window.matchMedia(COMPACT_TABLE_QUERY).matches && localStorage.getItem('change-cards-scrapbook-tip-v1') !== 'seen'
@@ -1641,7 +1703,7 @@ function TopBar({ onRestart, savedCards, activeRoute, routeNotes, onExitRoute, o
   return (
     <header className={`topbar ${activeRoute ? 'has-active-route' : ''}`}>
       <div className="topbar-workshop">
-        <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
+        <button className="logo-button" onClick={onHome} aria-label="Home — your table is saved"><Logo /></button>
         {savedCards.length > 0 && (
           <nav className="saved-pins" aria-label={`${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}>
             <button className={`saved-copy-button ${copied ? 'is-copied' : ''}`} type="button" onClick={onCopyAll} aria-label="Copy all saved ideas" title="Copy all saved ideas">
@@ -1677,7 +1739,7 @@ function TopBar({ onRestart, savedCards, activeRoute, routeNotes, onExitRoute, o
               aria-label={`Open scrapbook with ${savedCards.length} saved ${savedCards.length === 1 ? 'card' : 'cards'}`}
             >
               <ScrapbookIcon />
-              <span>Scrapbook</span>
+              <span className="desktop-saved-label">Scrapbook</span><span className="mobile-saved-label">Saved · {savedCards.length}</span>
             </button>
             {showScrapbookTip && <span className="scrapbook-nav-tip" role="status">Scrapbook</span>}
           </div>
@@ -1688,7 +1750,7 @@ function TopBar({ onRestart, savedCards, activeRoute, routeNotes, onExitRoute, o
   )
 }
 
-function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorder }) {
+function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorder, onCopyAll, copied }) {
   const dialogRef = useRef(null)
   const closeRef = useRef(null)
   const pointerDragRef = useRef(null)
@@ -1802,6 +1864,7 @@ function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorde
       <header className="scrapbook-header">
         <h1 id="scrapbook-title" className="sr-only">Scrapbook</h1>
         <OriginalNote idea={idea} compact scrapbook />
+        <button className="scrapbook-copy-all" type="button" onClick={onCopyAll}>{copied ? 'Copied' : 'Copy all ideas'}</button>
         <button ref={closeRef} className="scrapbook-close" type="button" onClick={onClose} aria-label="Close scrapbook">×</button>
       </header>
       <div className="scrapbook-scroll">
@@ -1877,7 +1940,7 @@ function OriginalNote({ idea, compact = false, scrapbook = false }) {
   )
 }
 
-function Tabletop({ session, update, activeCard: activeState, savedCards, openCard: openActiveCard, closeCard, setActiveCard, copyFeedback, onCopyIdea }) {
+function Tabletop({ session, update, activeCard: activeState, savedCards, openCard: openActiveCard, closeCard, setActiveCard, copyFeedback, onCopyIdea, onSaved }) {
   const canvasRef = useRef(null)
   const deckRef = useRef(null)
   const routesButtonRef = useRef(null)
@@ -1889,6 +1952,21 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const previousActiveRouteRef = useRef(null)
   const [sparkStates, setSparkStates] = useState({})
   const [tableScrolled, setTableScrolled] = useState(false)
+  const [ideaPinned, setIdeaPinned] = useState(false)
+  useEffect(() => {
+    const syncScroll = () => {
+      setTableScrolled(window.scrollY > 40)
+      const note = canvasRef.current?.querySelector(':scope > .original-note')
+      setIdeaPinned(Boolean(note && note.getBoundingClientRect().top < 90))
+    }
+    syncScroll()
+    window.addEventListener('scroll', syncScroll, { passive: true })
+    window.addEventListener('resize', syncScroll)
+    return () => {
+      window.removeEventListener('scroll', syncScroll)
+      window.removeEventListener('resize', syncScroll)
+    }
+  }, [])
   const [dragOverDeck, setDragOverDeck] = useState(false)
   const [mobileRearranging, setMobileRearranging] = useState(false)
   const [dealFlight, setDealFlight] = useState(null)
@@ -1906,8 +1984,33 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const dealtCardIds = session.dealtCardIds || []
   const cardPositions = session.cardPositions || {}
   const notes = session.swarm || {}
+  const [tableViewport, setTableViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
+  useEffect(() => {
+    const resize = () => setTableViewport({ width: window.innerWidth, height: window.innerHeight })
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [])
+  const arrangement = useMemo(() => {
+    const width = tableViewport.width
+    const columns = Math.max(4, Math.min(7, Math.floor((width - 230) / 180)))
+    const gap = 24
+    const cardWidth = (width - 230 - gap * (columns - 1)) / columns
+    const rowHeight = cardWidth * 1.4 + 30
+    const noteColumn = Math.floor((columns - 2) / 2)
+    const sparseTable = dealtCardIds.length <= columns - 2
+    const noteRow = sparseTable ? 0 : 1
+    const slots = []
+    for (let row = 0; slots.length < Math.max(1, dealtCardIds.length); row++) {
+      for (let column = 0; column < columns; column++) {
+        if ((row === noteRow || row === noteRow + 1) && column >= noteColumn && column < noteColumn + 2) continue
+        slots.push({ x: 200 + column * (cardWidth + gap), y: 40 + row * rowHeight })
+      }
+    }
+    const height = Math.max(tableViewport.height - 74, (sparseTable ? 2 : 3) * rowHeight + 60, slots[Math.max(0, dealtCardIds.length - 1)].y + rowHeight + 30)
+    return { width, height, cardWidth, slots, noteX: 200 + noteColumn * (cardWidth + gap), noteY: sparseTable ? 40 : 40 + rowHeight + (rowHeight * 2 - (cardWidth * 2 + gap) * .8) / 2, noteWidth: cardWidth * 2 + gap, noteHeight: (cardWidth * 2 + gap) * .8 }
+  }, [tableViewport, dealtCardIds.length])
   const remainingCards = CARDS.filter((card) => !dealtCardIds.includes(card.id))
-  const hasUnusedDealtCards = dealtCardIds.some((cardId) => !notes[cardId]?.visited)
+  const hasUnusedDealtCards = dealtCardIds.some((cardId) => !notes[cardId]?.visited && !session.drafts?.[cardId]?.trim())
   const activeRoute = CURATED_ROUTES.find((route) => route.id === session.activeRouteId) || null
   const layoutRoute = activeRoute || leavingRoute
   const activeRouteCardIds = activeRoute?.cardIds || []
@@ -1978,7 +2081,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         return
       }
       if (event.key !== 'Tab') return
-      const focusable = [...(modalRef.current?.querySelectorAll('button:not(:disabled), textarea, [href], [tabindex]:not([tabindex="-1"])') || [])]
+      const focusable = [...(modalRef.current?.querySelectorAll('button:not(:disabled), textarea, summary, [href], [tabindex]:not([tabindex="-1"])') || [])].filter((element) => element.tabIndex >= 0 && !element.closest('[inert]') && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden')
       if (!focusable.length) return
       const first = focusable[0]
       const last = focusable.at(-1)
@@ -2027,6 +2130,10 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   }), [notes])
 
   function defaultPosition(index) {
+    if (!layoutRoute && tableViewport.width > 820) {
+      const slot = arrangement.slots[index] || arrangement.slots[0]
+      return { x: slot.x / arrangement.width * 100, y: slot.y / arrangement.height * 100 }
+    }
     const layout = dealtCardIds.length > TABLE_CARD_POSITIONS.length ? DENSE_TABLE_CARD_POSITIONS : TABLE_CARD_POSITIONS
     const [x, y] = layout[index % layout.length]
     return { x, y }
@@ -2054,6 +2161,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth || 1200 : 1200
     let cardWidth = viewportWidth <= 720 ? Math.min(168, (viewportWidth - 48) / 2) : Math.min(136, Math.max(88, viewportWidth * 0.087))
     let cardHeight = cardWidth * 1.4
+    const artworkStyles = {}
     try {
       const canvas = canvasRef.current?.getBoundingClientRect()
       const deck = deckRef.current?.querySelector('.deck-stack')?.getBoundingClientRect()
@@ -2064,6 +2172,17 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
           toTop = target.top
           cardWidth = target.width
           cardHeight = target.height
+          const landedCard = canvasRef.current.querySelector(`[data-card-id="${pending.id}"]`)
+          // The flight lives outside the canvas; carry its resolved artwork styles
+          // so responsive canvas rules do not change its appearance on landing.
+          for (const selector of ['.card-front', '.card-category', '.card-symbol', '.card-icon', '.card-front strong']) {
+            const element = landedCard.querySelector(selector)
+            if (!element) continue
+            const computed = getComputedStyle(element)
+            artworkStyles[selector] = Object.fromEntries(
+              ['width', 'height', 'min-height', 'max-width', 'max-height', 'padding', 'font', 'line-height', 'letter-spacing', 'display', 'grid-template-rows', 'gap', 'align-self', 'overflow'].map((property) => [property, computed.getPropertyValue(property)]),
+            )
+          }
         } else {
           toLeft = canvas.left + (targetX / 100) * canvas.width
           toTop = canvas.top + (targetY / 100) * canvas.height
@@ -2085,6 +2204,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
       deltaY: toTop - fromTop,
       width: cardWidth,
       height: cardHeight,
+      artworkStyles,
       duration,
     }
     setDealFlight(flight)
@@ -2103,11 +2223,11 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   function dealAll() {
     if (!remainingCards.length) return
     if (coachStep === 'deck') setCoachStep('card')
-    update({ dealtCardIds: [...dealtCardIds, ...shuffleCards(remainingCards).map((card) => card.id)] })
+    update({ dealtCardIds: [...CARDS].sort((a, b) => ['multidisciplinary', 'ingenious', 'optimistic', 'flexible'].indexOf(a.category) - ['multidisciplinary', 'ingenious', 'optimistic', 'flexible'].indexOf(b.category) || a.id - b.id).map((card) => card.id), cardPositions: {}, activeRouteId: null })
   }
 
   function clearUnused() {
-    const keptCardIds = dealtCardIds.filter((cardId) => notes[cardId]?.visited)
+    const keptCardIds = dealtCardIds.filter((cardId) => notes[cardId]?.visited || session.drafts?.[cardId]?.trim())
     if (keptCardIds.length === dealtCardIds.length) return
     const keptCardSet = new Set(keptCardIds)
     const keptPositions = Object.fromEntries(
@@ -2168,7 +2288,10 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     setRouteCelebration(false)
     setLeavingRoute(route)
     update({ activeRouteId: null })
-    routeLeavingTimerRef.current = window.setTimeout(() => setLeavingRoute(null), 720)
+    routeLeavingTimerRef.current = window.setTimeout(() => {
+      setLeavingRoute(null)
+      if (window.matchMedia(COMPACT_TABLE_QUERY).matches) window.scrollTo({ top: 0, behavior: 'instant' })
+    }, 720)
   }
 
   function returnCard(cardId) {
@@ -2278,11 +2401,15 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
       ...notes,
       [card.id]: { note: cleanNote, visited: true, updatedAt: Date.now() },
     }
+    const nextDrafts = { ...session.drafts }
+    delete nextDrafts[card.id]
     update({
       swarm: nextNotes,
+      drafts: nextDrafts,
     })
     setSparkStates({})
     closeCard()
+    onSaved?.()
     if (!activeRoute?.cardIds.includes(card.id)) return
     const nextUnfinishedId = activeRoute.cardIds.find((cardId) => !nextNotes[cardId]?.visited)
     if (nextUnfinishedId) {
@@ -2298,15 +2425,16 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
       return
     }
     setRouteCelebration(true)
-    routeExitTimerRef.current = window.setTimeout(() => exitRoute(activeRoute), 1500)
+    // Keep the completed route visible until the player chooses to leave it.
   }
 
   return (
     <section
-      className={`tabletop ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${hasUnusedDealtCards ? 'has-unused-cards' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
+      className={`tabletop ${!layoutRoute && dealtCardIds.length ? 'is-arranged' : ''} ${!dealtCardIds.length ? 'is-empty-table' : ''} ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${hasUnusedDealtCards ? 'has-unused-cards' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
       aria-label="Change Cards idea table"
       onScroll={(event) => setTableScrolled(event.currentTarget.scrollTop > 32)}
     >
+      <div className="workshop-tools">
       <aside className={`side-deck ${dragOverDeck ? 'is-drop-target' : ''} ${coachStep === 'deck' ? 'is-coaching-deck' : ''}`} ref={deckRef} aria-label="Card deck">
         <button
           type="button"
@@ -2330,10 +2458,12 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
           </div>
         )}
         {(dragOverDeck || !remainingCards.length) && <p>{dragOverDeck ? 'Drop to return it' : 'All cards dealt'}</p>}
+        {ideaPinned && <p className="pinned-starting-idea">{session.idea}</p>}
         <div className="deal-controls">
+          <button className="deck-control-button draw-card-button" type="button" onClick={dealOne} disabled={!remainingCards.length || Boolean(dealFlight)}><span className="deck-control-icon is-draw"><DrawCardIcon /></span><span className="deck-control-label">Draw a card</span></button>
           <button className="deck-control-button deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>
             <span className="deck-control-icon is-deal"><DealAllIcon /></span>
-            <span className="deck-control-label">Deal all</span>
+            <span className="deck-control-label">Deal all 40</span>
           </button>
           {hasUnusedDealtCards && (
             <button
@@ -2357,13 +2487,20 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
             onClick={() => setRoutesOpen((open) => !open)}
           >
             <span className="deck-control-icon is-route"><RouteIcon /></span>
-            <span className="deck-control-label">Routes</span>
+            <span className="deck-control-label">Guided routes</span>
           </button>
         </div>
       </aside>
+        <aside className="mobile-idea-summary" aria-label="Your starting idea"><p>{session.idea}</p></aside>
+      </div>
 
-      <div className="tabletop-canvas" ref={canvasRef}>
+      <div className="tabletop-canvas" ref={canvasRef} style={{ '--arranged-height': `${arrangement.height}px`, '--arranged-card-width': `${arrangement.cardWidth}px`, '--note-x': `${arrangement.noteX}px`, '--note-y': `${arrangement.noteY}px`, '--note-width': `${arrangement.noteWidth}px`, '--note-height': `${arrangement.noteHeight}px` }}>
         <OriginalNote idea={session.idea} />
+        {!dealtCardIds.length && <section className="table-welcome">
+          <h2>One card.<br /><em>A different possibility.</em></h2>
+          <p>Draw a prompt and see where it takes you, or follow four cards with a shared purpose.</p>
+          <div><button className="ink-button" type="button" onClick={dealOne} disabled={Boolean(dealFlight)}>Draw my first card ↗</button><button className="text-button" type="button" onClick={() => setRoutesOpen(true)}>Follow a guided route →</button></div>
+        </section>}
 
         {routesOpen && (
           <button
@@ -2396,7 +2533,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
               route={activeRoute}
               notes={notes}
               completedCount={routeCompletedCount}
-              celebrating={routeCelebration}
+              celebrating={routeCelebration || routeCompletedCount === activeRoute.cardIds.length}
               onExit={() => exitRoute(activeRoute)}
             />
             <RoutePath route={activeRoute} notes={notes} />
@@ -2456,7 +2593,13 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
             '--flight-height': `${dealFlight.height}px`,
           }}
         >
-          <div className="deal-flight-arc">
+          <div className="deal-flight-arc" ref={(element) => {
+            if (!element) return
+            for (const [selector, properties] of Object.entries(dealFlight.artworkStyles)) {
+              const artwork = element.querySelector(selector)
+              if (artwork) for (const [property, value] of Object.entries(properties)) artwork.style.setProperty(property, value)
+            }
+          }}>
             <ChangeCard key={dealFlight.id} card={dealFlight.card} index={0} />
           </div>
         </div>
@@ -2492,7 +2635,9 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
               <ChangeCard card={activeCard} selected>
                 <GenerationSurface
                   card={activeCard}
-                  initialValue={notes[activeCard.id]?.note || ''}
+                  key={activeCard.id}
+                  onDraftChange={(draft) => update((current) => ({ drafts: { ...current.drafts, [activeCard.id]: draft } }))}
+                  initialValue={session.drafts?.[activeCard.id] ?? notes[activeCard.id]?.note ?? ''}
                   submitLabel="Save idea"
                   sparkState={sparkStates[activeCard.id]}
                   onSubmit={(response) => saveNote(activeCard, response)}
@@ -2509,6 +2654,18 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
 }
 
 function RouteChooser({ routes, activeRouteId, onChoose, onClose }) {
+  const chooserRef = useRef(null)
+  useEffect(() => {
+    chooserRef.current?.querySelector('.route-slip')?.focus({ preventScroll: true })
+  }, [])
+  const trapFocus = (event) => {
+    if (event.key !== 'Tab') return
+    const controls = [...chooserRef.current.querySelectorAll('button:not(:disabled)')].filter((element) => element.getClientRects().length)
+    const first = controls[0]
+    const last = controls.at(-1)
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+  }
   const slipsRef = useRef(null)
   const [scrollEdges, setScrollEdges] = useState({ previous: false, next: false })
 
@@ -2548,8 +2705,8 @@ function RouteChooser({ routes, activeRouteId, onChoose, onClose }) {
   }
 
   return (
-    <section id="curated-routes" className="route-chooser" aria-label="Curated routes">
-      <h2 className="sr-only">Choose a four-card route</h2>
+    <section ref={chooserRef} onKeyDown={trapFocus} id="curated-routes" className="route-chooser" role="dialog" aria-modal="true" aria-label="Choose a four-card route">
+      <header className="route-chooser-heading"><h2>Choose a four-card route</h2></header>
       <button className="route-chooser-close" type="button" onClick={onClose} aria-label="Close routes">×</button>
       <div ref={slipsRef} className="route-slips">
         {routes.map((route, routeIndex) => (
@@ -2574,6 +2731,7 @@ function RouteChooser({ routes, activeRouteId, onChoose, onClose }) {
                 )
               })}
             </i>
+            <span className="route-start">Start this route →</span>
           </button>
         ))}
       </div>
@@ -2595,8 +2753,8 @@ function RouteRibbon({ route, notes, completedCount, celebrating, onExit }) {
   return (
     <aside className={`route-ribbon ${celebrating ? 'is-celebrating' : ''}`} aria-live="polite">
       <div>
-        <strong>{celebrating ? 'Route complete' : route.name}</strong>
-        <span>{completedCount} / {route.cardIds.length}</span>
+        <strong>{route.name}</strong>
+        <span>{celebrating ? 'All four ideas saved. Your route is complete.' : `Step ${Math.min(completedCount + 1, route.cardIds.length)} of ${route.cardIds.length} · ${completedCount} saved`}</span>
       </div>
       <ol aria-label={`${completedCount} of ${route.cardIds.length} route cards complete`}>
         {route.cardIds.map((cardId, index) => (
@@ -2605,7 +2763,7 @@ function RouteRibbon({ route, notes, completedCount, celebrating, onExit }) {
           </li>
         ))}
       </ol>
-      <button type="button" onClick={onExit} aria-label={`Leave ${route.name}`}>×</button>
+      <button type="button" onClick={onExit} aria-label={`Leave ${route.name}`}>{celebrating ? 'Finish route' : 'Leave route'}</button>
     </aside>
   )
 }
@@ -2749,7 +2907,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
     if (event.button !== 0) return
     event.preventDefault()
     event.stopPropagation()
-    const scrollContainer = canvasRef.current?.closest('.tabletop')
+    const scrollContainer = document.scrollingElement
     if (!scrollContainer) return
     mobileDrag.current = {
       pointerId: event.pointerId,
@@ -3237,12 +3395,6 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, onDra
   }, [])
 
   useEffect(() => {
-    setDraft(initialValue)
-    setTakenSparks([])
-    onDraftChange?.(initialValue)
-  }, [card.id, initialValue])
-
-  useEffect(() => {
     setSparkIndex(0)
     setSparkVisible(true)
   }, [sparkState?.cardId])
@@ -3275,11 +3427,9 @@ function GenerationSurface({ card, sparkState, onSubmit, onRetry, onClose, onDra
   }
 
   const takeSpark = (spark) => {
-    setDraft((current) => {
-      const next = `${current.trim()}${current.trim() ? '\n' : ''}${spark} — `
-      onDraftChange?.(next)
-      return next
-    })
+    const next = `${draft.trim()}${draft.trim() ? '\n' : ''}${spark} — `
+    setDraft(next)
+    onDraftChange?.(next)
     setTakenSparks((current) => current.includes(spark) ? current : [...current, spark])
     window.setTimeout(() => editorRef.current?.focus({ preventScroll: true }), 0)
   }

@@ -13,7 +13,9 @@
     "verify:coop-routing": "node scripts/verify-coop-routing.mjs",
     "verify:sparks:new": "node scripts/verify-new-sparks.mjs",
     "verify:saved": "node scripts/verify-saved.mjs",
-    "verify:routes": "node scripts/verify-routes.mjs"
+    "verify:routes": "node scripts/verify-routes.mjs",
+    "verify:ux": "node scripts/verify-ux.mjs",
+    "verify:coop:live": "node scripts/verify-coop-live.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

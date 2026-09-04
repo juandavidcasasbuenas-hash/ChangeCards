@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import 'charter-webfont/charter.css'
 import App from './App.jsx'
 import './styles.css'
+import './ux.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
