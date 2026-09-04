@@ -89,11 +89,14 @@ try {
       ids: cards.map((card) => Number(card.dataset.cardId)),
       routeIds: cards.filter((card) => card.classList.contains('is-route-card')).map((card) => Number(card.dataset.cardId)),
       backgroundIds: cards.filter((card) => card.classList.contains('is-route-background')).map((card) => Number(card.dataset.cardId)),
+      backgroundInert: cards.filter((card) => card.classList.contains('is-route-background')).every((card) => card.inert && getComputedStyle(card).pointerEvents === 'none'),
+      routeCardsInteractive: cards.filter((card) => card.classList.contains('is-route-card')).every((card) => !card.inert && getComputedStyle(card).pointerEvents !== 'none'),
       routePositions: cards.filter((card) => card.classList.contains('is-route-card')).map((card) => ({ left: card.style.left, top: card.style.top })),
       remaining: table.querySelector('.deck-back > span:last-child')?.textContent,
+      pencilStrokes: table.querySelectorAll('.route-path path').length,
     }
   })
-  if (JSON.stringify(routeFromPartialDeck.routeIds) !== JSON.stringify([13, 7, 14, 15]) || routeFromPartialDeck.backgroundIds[0] !== 1 || routeFromPartialDeck.remaining !== '35') {
+  if (JSON.stringify(routeFromPartialDeck.routeIds) !== JSON.stringify([13, 7, 14, 15]) || routeFromPartialDeck.backgroundIds[0] !== 1 || routeFromPartialDeck.remaining !== '35' || !routeFromPartialDeck.backgroundInert || !routeFromPartialDeck.routeCardsInteractive || routeFromPartialDeck.pencilStrokes !== 3) {
     throw new Error(`Route did not gather and deal cleanly: ${JSON.stringify(routeFromPartialDeck)}`)
   }
   if (new Set(routeFromPartialDeck.routePositions.map(({ left, top }) => `${left}/${top}`)).size !== 4) {
@@ -111,7 +114,23 @@ try {
   await page.click('.response-submit')
   await page.waitForSelector('.active-card-layer', { hidden: true })
   await page.waitForSelector('.table-card-shell[data-card-id="13"].is-route-complete')
+  const completedCard = await page.$eval('.table-card-shell[data-card-id="13"]', (element) => ({
+    opacity: getComputedStyle(element.querySelector('.change-card')).opacity,
+    faceDown: element.querySelector('.change-card').classList.contains('is-face-down'),
+    savedNote: element.querySelector('.saved-note')?.textContent,
+    routeNumber: element.querySelector('.route-step-marker')?.textContent?.trim(),
+    markerLayer: getComputedStyle(element.querySelector('.route-step-marker')).zIndex,
+  }))
+  if (completedCard.opacity !== '1' || !completedCard.faceDown || !completedCard.savedNote?.includes('welcome ritual') || completedCard.routeNumber !== '1' || Number(completedCard.markerLayer) <= 30) {
+    throw new Error(`Completed route card disappeared instead of showing its saved back: ${JSON.stringify(completedCard)}`)
+  }
   if (!await page.$('.table-card-shell[data-card-id="7"].is-route-next')) throw new Error('The next route card is not signposted')
+
+  await page.hover('.table-card-shell[data-card-id="14"] .card-front')
+  await page.mouse.move(1, 899)
+  await new Promise((resolve) => setTimeout(resolve, 35))
+  const postHoverOpacity = await page.$eval('.table-card-shell[data-card-id="14"] .change-card', (element) => getComputedStyle(element).opacity)
+  if (postHoverOpacity !== '1') throw new Error(`A route card disappeared after hover: opacity ${postHoverOpacity}`)
 
   await page.click('.table-card-shell[data-card-id="7"] .card-front')
   await page.waitForSelector('.response-editor')
@@ -133,6 +152,20 @@ try {
   }))
   if (restoredCard.left !== '45%' || restoredCard.top !== '23%' || restoredCard.background) {
     throw new Error(`Leaving the route changed the original table: ${JSON.stringify(restoredCard)}`)
+  }
+
+  await page.click('.clear-unused-button')
+  await page.waitForFunction(() => document.querySelectorAll('.tabletop-canvas > .table-card-shell').length === 1)
+  const clearedState = await page.evaluate(() => {
+    const session = JSON.parse(localStorage.getItem('change-cards-session-v1'))
+    return {
+      ids: session.dealtCardIds,
+      saved: session.swarm?.[13]?.visited,
+      remaining: document.querySelector('.deck-back > span:last-child')?.textContent,
+    }
+  })
+  if (JSON.stringify(clearedState.ids) !== JSON.stringify([13]) || !clearedState.saved || clearedState.remaining !== '39') {
+    throw new Error(`Clear unused did not preserve only completed work: ${JSON.stringify(clearedState)}`)
   }
 
   await page.click('.deal-all-button')
@@ -166,25 +199,32 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 220))
     compactRouteLayouts.push(await page.$eval('.tabletop', (table) => {
       const cards = [...table.querySelectorAll('.tabletop-canvas > .table-card-shell')]
-      const ribbon = table.querySelector('.route-ribbon')?.getBoundingClientRect()
+      const ribbon = table.querySelector('.route-ribbon')
+      const nav = document.querySelector('.route-nav-status')
+      const navRect = nav?.getBoundingClientRect()
+      const sideDeckVeil = getComputedStyle(table.querySelector('.side-deck'), '::before')
       return {
         width: innerWidth,
         firstFour: cards.slice(0, 4).map((card) => Number(card.dataset.cardId)),
         scrollable: table.scrollHeight > table.clientHeight,
         horizontalOverflow: table.scrollWidth > table.clientWidth + 1 || document.body.scrollWidth > innerWidth + 1,
-        ribbonContained: ribbon && ribbon.left >= 0 && ribbon.right <= innerWidth,
+        ribbonHidden: ribbon && getComputedStyle(ribbon).display === 'none',
+        navVisible: nav && getComputedStyle(nav).display !== 'none',
+        navContained: navRect && navRect.left >= 0 && navRect.right <= innerWidth,
+        deckVeil: sideDeckVeil.backgroundColor !== 'rgba(0, 0, 0, 0)' && (sideDeckVeil.backdropFilter || sideDeckVeil.webkitBackdropFilter) !== 'none',
         backgroundCount: cards.filter((card) => card.classList.contains('is-route-background')).length,
+        backgroundInert: cards.filter((card) => card.classList.contains('is-route-background')).every((card) => card.inert && getComputedStyle(card).pointerEvents === 'none'),
       }
     }))
   }
-  const brokenCompactLayout = compactRouteLayouts.find((layout) => JSON.stringify(layout.firstFour) !== JSON.stringify([6, 22, 20, 8]) || !layout.scrollable || layout.horizontalOverflow || !layout.ribbonContained || layout.backgroundCount !== 36)
+  const brokenCompactLayout = compactRouteLayouts.find((layout) => JSON.stringify(layout.firstFour) !== JSON.stringify([6, 22, 20, 8]) || !layout.scrollable || layout.horizontalOverflow || !layout.ribbonHidden || !layout.navVisible || !layout.navContained || !layout.deckVeil || layout.backgroundCount !== 36 || !layout.backgroundInert)
   if (brokenCompactLayout) throw new Error(`Compact route layout failed: ${JSON.stringify(compactRouteLayouts)}`)
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 })
   await new Promise((resolve) => setTimeout(resolve, 220))
   await page.screenshot({ path: '/tmp/change-cards-route-mobile.png', fullPage: false })
 
-  await page.click('.route-ribbon > button')
+  await page.click('.route-nav-status > button')
   await new Promise((resolve) => setTimeout(resolve, 760))
   if ((await page.$$('.table-card-shell')).length !== 40) throw new Error('Leaving a route removed cards from the full deck')
   await page.click('.routes-button')
@@ -262,10 +302,17 @@ try {
     routeAwareSparks: true,
     routeLineage: true,
     progressAndNextStep: true,
+    backgroundCardsInert: true,
+    clearUnusedPreservesWork: true,
+    routePath: true,
+    completedCardsRemainVisible: true,
+    routeHoverRemainsVisible: true,
     positionsRestored: true,
     fullDeckNoDuplicates: true,
     refreshPersistence: true,
     mobileScrollable: true,
+    compactProgressInTopbar: true,
+    compactDeckVeil: true,
     mouseAndKeyboardRouteScrolling: true,
     completionReturnsToTable: true,
   }, null, 2))

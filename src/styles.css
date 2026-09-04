@@ -439,6 +439,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .saved-pin .card-icon { position: relative; z-index: 1; width: 20px; height: 24px; }
 .saved-pin:hover, .saved-pin:focus-visible { z-index: 2; box-shadow: 3px 5px 0 rgba(23,23,19,.15); transform: translateY(-3px) rotate(0); }
 .saved-pins-count { display: grid; flex: 0 0 auto; place-items: center; min-width: 21px; height: 21px; border: 1px solid var(--rule); border-radius: 50%; color: var(--muted); background: rgba(250,247,237,.7); font: 500 7px/1 'DM Mono'; letter-spacing: .07em; }
+.route-nav-status { display: none; }
 .scrapbook-nav-entry { position: relative; }
 .scrapbook-nav-button { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; color: var(--violet); transition: color 160ms ease, transform 160ms ease; }
 .scrapbook-nav-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.35; }
@@ -630,6 +631,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .side-deck {
   position: absolute;
   z-index: 55;
+  isolation: isolate;
   top: 32px;
   left: clamp(20px, 2.5vw, 42px);
   width: 128px;
@@ -719,6 +721,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .deal-controls button.deal-all-button { color: var(--ink); background: #f0d47b; }
 .deal-controls .deal-all-button::before { content: '✣'; color: var(--ink); }
 .deal-controls button.deal-all-button:hover:not(:disabled) { color: var(--ink); background: #f5dc91; }
+.deal-controls button.clear-unused-button { color: var(--ink); background: rgba(253,250,241,.9); }
+.deal-controls button.clear-unused-button::before { content: '↶'; color: var(--violet); font: 600 14px/1 'DM Sans'; }
+.deal-controls button.clear-unused-button:hover:not(:disabled) { color: var(--ink); background: var(--paper-light); }
 .deal-controls button.routes-button {
   color: var(--paper-light);
   background: var(--violet);
@@ -899,11 +904,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   transition: left 680ms var(--ease-out), top 680ms var(--ease-out), filter 260ms ease, opacity 260ms ease;
 }
 .tabletop.is-dense.has-active-route .table-card-shell.is-route-card { width: clamp(96px, 8.7vw, 136px); }
-.table-card-shell.is-route-background { opacity: .2; filter: saturate(.38) blur(.35px); }
-.table-card-shell.is-route-background:hover, .table-card-shell.is-route-background:focus-within { opacity: .82; filter: saturate(.9); }
+.table-card-shell.is-route-background { pointer-events: none; opacity: .2; filter: saturate(.38) blur(.35px); }
 .route-step-marker {
   position: absolute;
-  z-index: 8;
+  z-index: 40;
   top: -10px;
   right: -10px;
   display: grid;
@@ -916,10 +920,13 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   background: var(--violet);
   box-shadow: 2px 3px 0 rgba(23,23,19,.18);
   font: 600 8px/1 'DM Mono';
+  pointer-events: none;
   transform: rotate(5deg);
 }
 .table-card-shell.is-route-complete .route-step-marker { color: var(--violet); background: var(--paper-light); }
 .table-card-shell.is-route-next .change-card { animation: routeNextCard 2.8s ease-in-out infinite; }
+.table-card-shell.is-route-card:not(.is-route-dealing):not(.is-route-next) .change-card { opacity: 1; animation: none; }
+.table-card-shell.is-route-complete .change-card { opacity: 1; animation: none; }
 .table-card-shell.is-route-next .route-step-marker { animation: routeNextMarker 1.9s ease-in-out infinite; }
 .table-card-shell.is-route-dealing .change-card { animation: routeDealCard 820ms var(--route-arrival-delay) var(--ease-out) both; }
 @keyframes routeDealCard {
@@ -1152,6 +1159,13 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 @media (hover: hover) and (pointer: fine) {
   .change-card:hover:not(.is-selected) { z-index: 30; filter: saturate(1.06); transform: translateY(-6px) rotate(0) scale(1.065); }
+  .tabletop.has-active-route .table-card-shell.is-route-card:not(.is-route-dealing):hover .change-card:not(.is-selected),
+  .tabletop.has-active-route .table-card-shell.is-route-card:not(.is-route-dealing):focus-within .change-card:not(.is-selected) {
+    opacity: 1;
+    animation: none;
+    filter: saturate(1.04) drop-shadow(0 8px 11px rgba(45,38,27,.13));
+    transform: translateY(-2px) rotate(var(--tilt)) scale(1.01);
+  }
 }
 
 .change-card.category-multidisciplinary { --card-color: var(--blue); }
@@ -2105,6 +2119,28 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .saved-pin { flex-basis: 27px; width: 27px; height: 38px; padding: 4px; }
   .saved-pin .card-icon { width: 17px; height: 21px; }
   .saved-pins-count { min-width: 18px; height: 18px; font-size: 5.5px; }
+  .topbar.has-active-route .saved-pins { display: none; }
+  .route-nav-status {
+    display: grid;
+    grid-template-columns: minmax(38px, 1fr) auto 30px;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    height: 46px;
+    border-left: 1px solid var(--rule);
+    padding-left: 10px;
+  }
+  .route-nav-copy { min-width: 0; }
+  .route-nav-copy strong { display: block; overflow: hidden; font: 600 10px/1.08 'DM Sans'; text-overflow: ellipsis; white-space: nowrap; }
+  .route-nav-copy span { display: block; margin-top: 3px; color: var(--muted); font: 500 6px/1 'DM Mono'; letter-spacing: .04em; }
+  .route-nav-status ol { display: flex; gap: 3px; margin: 0; padding: 0; list-style: none; }
+  .route-nav-status li { display: grid; place-items: center; width: 14px; height: 19px; border: 1px solid rgba(23,23,19,.3); color: var(--muted); background: var(--paper-light); transform: rotate(-2deg); }
+  .route-nav-status li:nth-child(even) { transform: rotate(2deg); }
+  .route-nav-status li span { font: 500 5px/1 'DM Mono'; }
+  .route-nav-status li.is-complete { color: var(--paper-light); border-color: var(--violet); background: var(--violet); }
+  .route-nav-status > button { display: grid; place-items: center; width: 30px; height: 38px; border: 0; border-radius: 8px; padding: 0; background: transparent; cursor: pointer; font: 400 21px/1 'DM Sans'; touch-action: manipulation; }
+  .route-nav-status > button:hover, .route-nav-status > button:focus-visible { background: rgba(23,23,19,.07); }
   .scrapbook-header { padding: 14px 60px 13px 13px; }
   .scrapbook-close { top: 6px; right: 5px; width: 46px; height: 46px; touch-action: manipulation; }
   .scrapbook-scroll { padding: 40px 19px max(90px, calc(env(safe-area-inset-bottom) + 70px)); }
@@ -2150,6 +2186,19 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
     padding: 18px 14px max(120px, calc(env(safe-area-inset-bottom) + 88px));
   }
   .side-deck { top: 18px; left: 16px; width: 92px; }
+  .side-deck::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -9px -10px -11px -10px;
+    border: 1px solid rgba(27,26,23,.08);
+    border-radius: 15px;
+    background: rgba(243,239,227,.77);
+    box-shadow: 0 8px 22px rgba(45,38,27,.08);
+    -webkit-backdrop-filter: blur(5px) saturate(.78);
+    backdrop-filter: blur(5px) saturate(.78);
+    pointer-events: none;
+  }
   .deck-stack { width: 84px; height: 118px; margin: 0 0 10px; touch-action: manipulation; }
   .deck-back { padding: 11px 10px 9px; box-shadow: 4px 6px 0 rgba(23,23,19,.15), 0 11px 20px rgba(42,35,25,.16); }
   .deck-back .logo { font-size: 12px; }
@@ -2178,12 +2227,13 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
     left: auto;
     width: calc(100% - 110px);
     min-height: 148px;
-    margin-left: 110px;
+    margin: 0 0 24px 110px;
     padding: 23px 18px 20px;
     transform: rotate(-.8deg);
     transform-origin: top right;
     transition: box-shadow 220ms ease, transform 220ms ease;
   }
+  .tabletop.has-unused-cards .tabletop-canvas > .original-note { margin-bottom: 76px; }
   .tabletop.has-scrolled .tabletop-canvas > .original-note {
     box-shadow: 9px 12px 0 rgba(23,23,19,.09), 0 15px 26px rgba(48,42,30,.14);
     transform: rotate(-.5deg) scale(.82);
@@ -2434,6 +2484,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .active-card-wrap { width: min(480px, 100%); }
 }
 
+@media (max-width: 430px) {
+  .route-nav-status { grid-template-columns: auto 30px; gap: 6px; }
+  .route-nav-copy { display: none; }
+  .route-nav-status li { width: 13px; }
+}
+
 @media (max-width: 820px) and (max-height: 680px) {
   .active-card-wrap .generation-surface { padding: 20px 18px 14px; }
   .active-card-wrap .response-workbench { gap: 10px; }
@@ -2558,29 +2614,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .route-slip > span { font-size: 11px; }
   .route-slip-cards > b { width: 31px; }
   .route-slip-cards .card-icon { width: 20px; height: 20px; }
-  .route-ribbon {
-    position: relative;
-    z-index: 45;
-    top: auto;
-    right: auto;
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) auto 38px;
-    width: 100%;
-    max-width: none;
-    min-height: 54px;
-    margin-top: 45px;
-    padding: 8px 7px 8px 12px;
-  }
-  .route-ribbon > div strong { font-size: 12px; }
-  .route-ribbon ol { gap: 4px; }
-  .route-ribbon li { width: 18px; height: 24px; }
-  .route-ribbon > button { width: 38px; height: 38px; touch-action: manipulation; }
+  .route-ribbon { display: none; }
   .route-path { display: none; }
   .tabletop.has-active-route .table-card-shell.is-route-card,
   .tabletop.is-route-leaving .table-card-shell.is-route-card { z-index: auto; transition: filter 260ms ease, opacity 260ms ease, transform 260ms var(--ease-out); }
   .tabletop.is-dense.has-active-route .table-card-shell.is-route-card { width: 100%; }
   .table-card-shell.is-route-background { opacity: .36; filter: saturate(.55); }
-  .table-card-shell.is-route-background:active, .table-card-shell.is-route-background:focus-within { opacity: 1; filter: none; }
   .route-step-marker { top: -9px; right: -7px; width: 31px; height: 31px; font-size: 9px; }
   .onboarding-hint small { font-size: 8px; }
   .deck-onboarding-hint strong { font-size: 14px; }

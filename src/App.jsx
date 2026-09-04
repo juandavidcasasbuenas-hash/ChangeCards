@@ -430,6 +430,7 @@ function App() {
       if (bIndex !== undefined) return 1
       return (session.swarm[b.id]?.updatedAt || 0) - (session.swarm[a.id]?.updatedAt || 0)
     })
+  const activeRoute = CURATED_ROUTES.find((route) => route.id === session.activeRouteId) || null
 
   const reorderScrapbookCard = (cardId, targetId) => {
     if (cardId === targetId) return
@@ -447,6 +448,9 @@ function App() {
       <TopBar
         onRestart={startAgain}
         savedCards={savedCards}
+        activeRoute={activeRoute}
+        routeNotes={session.swarm || {}}
+        onExitRoute={() => update({ activeRouteId: null })}
         onOpenSaved={(cardId, trigger) => openCard(cardId, 'review', trigger)}
         onOpenScrapbook={openScrapbook}
         onCopyAll={() => copyWithFeedback('all', formatAllSavedIdeas(session.idea, session.swarm), 'All saved ideas copied.')}
@@ -1440,7 +1444,27 @@ function ScrapbookIcon() {
   )
 }
 
-function TopBar({ onRestart, savedCards, onOpenSaved, onOpenScrapbook, onCopyAll, copied }) {
+function RouteNavStatus({ route, notes, onExit }) {
+  const completedCount = route.cardIds.filter((cardId) => notes[cardId]?.visited).length
+  return (
+    <aside className="route-nav-status" aria-live="polite">
+      <div className="route-nav-copy">
+        <strong>{route.name}</strong>
+        <span>{completedCount} / {route.cardIds.length}</span>
+      </div>
+      <ol aria-label={`${completedCount} of ${route.cardIds.length} route cards complete`}>
+        {route.cardIds.map((cardId, index) => (
+          <li key={cardId} className={notes[cardId]?.visited ? 'is-complete' : ''}>
+            <span>{index + 1}</span>
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={onExit} aria-label={`Leave ${route.name}`}>×</button>
+    </aside>
+  )
+}
+
+function TopBar({ onRestart, savedCards, activeRoute, routeNotes, onExitRoute, onOpenSaved, onOpenScrapbook, onCopyAll, copied }) {
   const [showScrapbookTip, setShowScrapbookTip] = useState(() => {
     try {
       return window.matchMedia(COMPACT_TABLE_QUERY).matches && localStorage.getItem('change-cards-scrapbook-tip-v1') !== 'seen'
@@ -1465,7 +1489,7 @@ function TopBar({ onRestart, savedCards, onOpenSaved, onOpenScrapbook, onCopyAll
   }
 
   return (
-    <header className="topbar">
+    <header className={`topbar ${activeRoute ? 'has-active-route' : ''}`}>
       <div className="topbar-workshop">
         <button className="logo-button" onClick={onRestart} aria-label="Start Change Cards again"><Logo /></button>
         {savedCards.length > 0 && (
@@ -1491,6 +1515,7 @@ function TopBar({ onRestart, savedCards, onOpenSaved, onOpenScrapbook, onCopyAll
             <span className="saved-pins-count" aria-hidden="true">{savedCards.length}</span>
           </nav>
         )}
+        {activeRoute && <RouteNavStatus route={activeRoute} notes={routeNotes} onExit={onExitRoute} />}
       </div>
       <div className="topbar-actions">
         {savedCards.length > 0 && (
@@ -1711,6 +1736,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const routeArrivalTimerRef = useRef(null)
   const routeExitTimerRef = useRef(null)
   const routeLeavingTimerRef = useRef(null)
+  const previousActiveRouteRef = useRef(null)
   const [sparkStates, setSparkStates] = useState({})
   const [tableScrolled, setTableScrolled] = useState(false)
   const [dragOverDeck, setDragOverDeck] = useState(false)
@@ -1731,6 +1757,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const cardPositions = session.cardPositions || {}
   const notes = session.swarm || {}
   const remainingCards = CARDS.filter((card) => !dealtCardIds.includes(card.id))
+  const hasUnusedDealtCards = dealtCardIds.some((cardId) => !notes[cardId]?.visited)
   const activeRoute = CURATED_ROUTES.find((route) => route.id === session.activeRouteId) || null
   const layoutRoute = activeRoute || leavingRoute
   const activeRouteCardIds = activeRoute?.cardIds || []
@@ -1744,6 +1771,17 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const reviewIndex = activeMode === 'review' ? savedCards.findIndex((card) => card.id === activeCard?.id) : -1
   const previousSavedCard = reviewIndex > 0 ? savedCards[reviewIndex - 1] : null
   const nextSavedCard = reviewIndex >= 0 && reviewIndex < savedCards.length - 1 ? savedCards[reviewIndex + 1] : null
+
+  useEffect(() => {
+    const previousRoute = previousActiveRouteRef.current
+    if (previousRoute && !activeRoute && !leavingRoute) {
+      window.clearTimeout(routeLeavingTimerRef.current)
+      setLeavingRoute(previousRoute)
+      setRouteCelebration(false)
+      routeLeavingTimerRef.current = window.setTimeout(() => setLeavingRoute(null), 720)
+    }
+    previousActiveRouteRef.current = activeRoute
+  }, [activeRoute, leavingRoute])
 
   useEffect(() => () => {
     window.clearTimeout(routeArrivalTimerRef.current)
@@ -1918,6 +1956,34 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     update({ dealtCardIds: [...dealtCardIds, ...shuffleCards(remainingCards).map((card) => card.id)] })
   }
 
+  function clearUnused() {
+    const keptCardIds = dealtCardIds.filter((cardId) => notes[cardId]?.visited)
+    if (keptCardIds.length === dealtCardIds.length) return
+    const keptCardSet = new Set(keptCardIds)
+    const keptPositions = Object.fromEntries(
+      Object.entries(cardPositions).filter(([cardId]) => keptCardSet.has(Number(cardId))),
+    )
+    window.clearTimeout(routeArrivalTimerRef.current)
+    window.clearTimeout(routeExitTimerRef.current)
+    if (activeRoute) {
+      window.clearTimeout(routeLeavingTimerRef.current)
+      setLeavingRoute(activeRoute)
+      routeLeavingTimerRef.current = window.setTimeout(() => setLeavingRoute(null), 720)
+    }
+    setRouteArrivalIds(new Set())
+    setRouteCelebration(false)
+    setRoutesOpen(false)
+    setSparkStates({})
+    setDragOverDeck(false)
+    setMobileRearranging(false)
+    update({
+      dealtCardIds: keptCardIds,
+      cardPositions: keptPositions,
+      activeRouteId: null,
+    })
+    if (!keptCardIds.length && coachStep === 'card') setCoachStep('deck')
+  }
+
   function activateRoute(route) {
     if (dealFlight) return
     window.clearTimeout(routeArrivalTimerRef.current)
@@ -1934,6 +2000,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     })
     routeArrivalTimerRef.current = window.setTimeout(() => setRouteArrivalIds(new Set()), 1350)
     window.setTimeout(() => {
+      if (!window.matchMedia?.(COMPACT_TABLE_QUERY).matches) return
       const firstUnfinishedId = route.cardIds.find((cardId) => !notes[cardId]?.visited)
       canvasRef.current?.querySelector(`[data-card-id="${firstUnfinishedId || route.cardIds[0]}"]`)?.scrollIntoView({
         behavior: 'smooth',
@@ -2086,7 +2153,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
 
   return (
     <section
-      className={`tabletop ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
+      className={`tabletop ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${hasUnusedDealtCards ? 'has-unused-cards' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
       aria-label="Change Cards idea table"
       onScroll={(event) => setTableScrolled(event.currentTarget.scrollTop > 32)}
     >
@@ -2115,6 +2182,17 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         {(dragOverDeck || !remainingCards.length) && <p>{dragOverDeck ? 'Drop to return it' : 'All cards dealt'}</p>}
         <div className="deal-controls">
           <button className="deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>Deal all</button>
+          {hasUnusedDealtCards && (
+            <button
+              className="clear-unused-button"
+              type="button"
+              onClick={clearUnused}
+              disabled={Boolean(dealFlight)}
+              aria-label="Return every unused card to the deck"
+            >
+              Clear unused
+            </button>
+          )}
           <button
             ref={routesButtonRef}
             className={`routes-button ${routesOpen ? 'is-open' : ''}`}
@@ -2640,6 +2718,8 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
       className={`table-card-shell ${visited ? 'is-visited' : ''} ${isDealing ? 'is-dealing' : ''} ${routeStep !== null ? 'is-route-card' : ''} ${routeComplete ? 'is-route-complete' : ''} ${routeNext ? 'is-route-next' : ''} ${routeBackground ? 'is-route-background' : ''} ${routeDealing ? 'is-route-dealing' : ''} ${showCoachmark ? 'has-coachmark' : ''} ${mobileDragging ? 'is-mobile-dragging' : ''}`}
       data-card-id={card.id}
       data-route-step={routeStep !== null ? routeStep + 1 : undefined}
+      inert={routeBackground}
+      aria-hidden={routeBackground ? 'true' : undefined}
       style={{
         left: `${localPosition.x}%`,
         top: `${localPosition.y}%`,
@@ -2659,7 +2739,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
       <ChangeCard card={card} index={index} onSelect={select} faceDown={visited} used={visited} savedNote={savedNote} />
       {routeStep !== null && (
         <span className="route-step-marker" aria-label={`Route step ${routeStep + 1}${routeComplete ? ', complete' : routeNext ? ', next' : ''}`}>
-          {routeComplete ? '✓' : routeStep + 1}
+          {routeStep + 1}
         </span>
       )}
       <button
