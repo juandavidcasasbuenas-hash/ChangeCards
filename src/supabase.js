@@ -65,6 +65,14 @@ export async function saveWorkshopIdea({ workshopId, idea }) {
   if (error) throw error
 }
 
+export async function setWorkshopRoute({ workshopId, routeId }) {
+  const { error } = await requireClient().rpc('set_change_cards_route', {
+    p_workshop_id: workshopId,
+    p_route_id: routeId,
+  })
+  if (error) throw error
+}
+
 export async function startNextRound(workshopId) {
   const { error } = await requireClient().rpc('start_change_cards_round', {
     p_workshop_id: workshopId,

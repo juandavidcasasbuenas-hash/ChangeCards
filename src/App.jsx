@@ -8,6 +8,7 @@ import {
   joinWorkshop,
   loadWorkshop,
   saveWorkshopIdea,
+  setWorkshopRoute,
   startNextRound,
   submitTransformation,
   subscribeToWorkshop,
@@ -822,6 +823,7 @@ function CoopWorkshop({ roomCode, onLeave }) {
   const isHost = Boolean(me?.is_host)
   const myAssignment = assignments.find((assignment) => assignment.round_number === workshop.round_number && assignment.participant_id === me?.id)
   const participantById = new Map(participants.map((participant) => [participant.id, participant]))
+  const route = CURATED_ROUTES.find((item) => item.id === workshop.route_id) || null
 
   return (
     <main className={`coop-page coop-status-${workshop.status}`}>
@@ -848,7 +850,9 @@ function CoopWorkshop({ roomCode, onLeave }) {
           isHost={isHost}
           busy={actionBusy}
           copied={inviteCopied}
+          route={route}
           onCopy={copyInvite}
+          onSetRoute={(routeId) => runAction(() => setWorkshopRoute({ workshopId: workshop.id, routeId }))}
           onStart={() => runAction(() => startNextRound(workshop.id))}
         />
       )}
@@ -858,6 +862,7 @@ function CoopWorkshop({ roomCode, onLeave }) {
           key={myAssignment.id}
           workshop={workshop}
           assignment={myAssignment}
+          route={route}
           participantCount={participants.length}
           isHost={isHost}
           onSubmit={(response) => submitTransformation({ assignmentId: myAssignment.id, response })}
@@ -872,6 +877,7 @@ function CoopWorkshop({ roomCode, onLeave }) {
       {workshop.status === 'between' && (
         <CoopBetween
           workshop={workshop}
+          route={route}
           participantCount={participants.length}
           isHost={isHost}
           busy={actionBusy}
@@ -886,6 +892,7 @@ function CoopWorkshop({ roomCode, onLeave }) {
           assignments={assignments.filter((assignment) => assignment.idea_id === myIdea.id)}
           participantById={participantById}
           targetRounds={workshop.target_rounds}
+          route={route}
           onLeave={onLeave}
         />
       )}
@@ -1006,25 +1013,130 @@ function CoopPostIt({ idea, label = 'The idea you’re changing', compact = fals
   )
 }
 
-function CoopRoundTrack({ current, target = 4 }) {
+function CoopRoundTrack({ current, target = 4, route = null }) {
   const safeCurrent = Math.max(1, Math.min(current, target))
   return (
-    <ol className="coop-round-track" aria-label={`Pass ${safeCurrent} of ${target}`}>
-      {Array.from({ length: target }, (_, index) => (
-        <li
-          key={index}
-          className={index + 1 < safeCurrent ? 'is-complete' : index + 1 === safeCurrent ? 'is-current' : ''}
-          aria-current={index + 1 === safeCurrent ? 'step' : undefined}
-          aria-label={`Pass ${index + 1}${index + 1 < safeCurrent ? ', complete' : index + 1 === safeCurrent ? ', current' : ', upcoming'}`}
-        >
-          <span>{String(index + 1).padStart(2, '0')}</span><i />
-        </li>
-      ))}
+    <ol
+      className={`coop-round-track ${route ? 'is-routed' : ''}`}
+      aria-label={`${route ? `${route.name}, ` : ''}pass ${safeCurrent} of ${target}`}
+      data-route-name={route?.name}
+    >
+      {Array.from({ length: target }, (_, index) => {
+        const card = route ? CARDS.find((item) => item.id === route.cardIds[index]) : null
+        return (
+          <li
+            key={index}
+            className={`${index + 1 < safeCurrent ? 'is-complete' : index + 1 === safeCurrent ? 'is-current' : ''} ${card ? `category-${card.category}` : ''}`}
+            aria-current={index + 1 === safeCurrent ? 'step' : undefined}
+            aria-label={`Pass ${index + 1}${card ? `, ${card.title}` : ''}${index + 1 < safeCurrent ? ', complete' : index + 1 === safeCurrent ? ', current' : ', upcoming'}`}
+            title={card?.title}
+          >
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <i>{card && <CardIcon id={card.id} />}</i>
+          </li>
+        )
+      })}
     </ol>
   )
 }
 
-function CoopLobby({ participants, ideas, myIdea, isHost, busy, copied, onCopy, onStart }) {
+function CoopRouteSelector({ route, isHost, busy, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef(null)
+  const closeRef = useRef(null)
+  const dialogRef = useRef(null)
+
+  const close = () => {
+    setOpen(false)
+    window.setTimeout(() => triggerRef.current?.focus({ preventScroll: true }), 0)
+  }
+
+  useEffect(() => {
+    if (!open) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeRef.current?.focus({ preventScroll: true })
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        close()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const controls = [...(dialogRef.current?.querySelectorAll('button:not([disabled])') || [])]
+      if (!controls.length) return
+      const first = controls[0]
+      const last = controls.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  const choose = (routeId) => {
+    onSelect?.(routeId)
+    close()
+  }
+
+  const summary = (
+    <>
+      <span className="coop-route-copy"><small>Four-pass route</small><strong>{route?.name || (isHost ? 'Choose a route' : 'Surprise me')}</strong></span>
+      <span className={`coop-route-miniatures ${route ? '' : 'is-random'}`} aria-hidden="true">
+        {(route?.cardIds || [1, 6, 10, 15]).map((cardId, index) => {
+          const card = CARDS.find((item) => item.id === cardId)
+          return <i key={cardId} className={`category-${card.category}`} style={{ '--mini-shift': `${index * -5}px`, '--mini-tilt': `${[-3, -1, 1, 3][index]}deg` }}>{route && <CardIcon id={cardId} />}</i>
+        })}
+      </span>
+      {isHost && <span className="coop-route-change">{route ? 'Change' : 'View routes'} <i aria-hidden="true">→</i></span>}
+    </>
+  )
+
+  return (
+    <div className="coop-route-setting">
+      {isHost ? (
+        <button ref={triggerRef} className="coop-route-trigger" type="button" onClick={() => setOpen(true)} disabled={busy} aria-haspopup="dialog" aria-expanded={open} aria-label={route ? `Change route. ${route.name} is selected.` : 'Choose a four-pass route. Surprise me is currently active.'}>
+          {summary}
+        </button>
+      ) : <div className="coop-route-trigger is-readonly">{summary}</div>}
+
+      {open && (
+        <div className="coop-route-dialog" role="dialog" aria-modal="true" aria-labelledby="coop-route-title">
+          <button className="coop-route-scrim" type="button" tabIndex={-1} aria-label="Close routes" onClick={close} />
+          <section ref={dialogRef}>
+            <header><h2 id="coop-route-title">Choose the four passes</h2><button ref={closeRef} type="button" onClick={close} aria-label="Close routes">×</button></header>
+            <div className="coop-route-options">
+              <button className={`coop-route-option is-surprise ${!route ? 'is-selected' : ''}`} type="button" onClick={() => choose(null)} aria-pressed={!route}>
+                <span className="coop-route-random-mark" aria-hidden="true">✦</span><strong>Surprise me</strong><small>A balanced mix, chosen for each idea.</small>
+              </button>
+              {CURATED_ROUTES.map((option, optionIndex) => (
+                <button key={option.id} className={`coop-route-option ${route?.id === option.id ? 'is-selected' : ''}`} style={{ '--option-index': optionIndex }} type="button" onClick={() => choose(option.id)} aria-pressed={route?.id === option.id}>
+                  <strong>{option.name}</strong><small>{option.purpose}</small>
+                  <span aria-hidden="true">
+                    {option.cardIds.map((cardId, index) => {
+                      const card = CARDS.find((item) => item.id === cardId)
+                      return <i key={cardId} className={`category-${card.category}`}><CardIcon id={cardId} /><b>{index + 1}</b></i>
+                    })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CoopLobby({ participants, ideas, myIdea, isHost, busy, copied, route, onCopy, onSetRoute, onStart }) {
   const readyIds = new Set(ideas.map((idea) => idea.owner_participant_id))
   const everyoneReady = participants.length >= 2 && participants.every((participant) => readyIds.has(participant.id))
   return (
@@ -1045,6 +1157,7 @@ function CoopLobby({ participants, ideas, myIdea, isHost, busy, copied, onCopy, 
             </li>
           ))}
         </ul>
+        <CoopRouteSelector route={route} isHost={isHost} busy={busy} onSelect={onSetRoute} />
         <button className={`coop-invite-button ${copied ? 'is-copied' : ''}`} type="button" onClick={onCopy}><b aria-hidden="true">＋</b><span>{copied ? 'Invite copied' : 'Copy invite link'}<small>Anyone with the link can join</small></span></button>
         {isHost ? (
           <button className="ink-button coop-start-button" type="button" onClick={onStart} disabled={!everyoneReady || busy}>{busy ? 'Starting pass…' : everyoneReady ? 'Start pass 1' : participants.length < 2 ? 'Waiting for another player…' : 'Waiting for all ideas…'}</button>
@@ -1082,7 +1195,7 @@ function CoopCountdown({ endsAt, onExpire, topbar = false }) {
   )
 }
 
-function CoopRound({ workshop, assignment, participantCount, isHost, onSubmit, onExpire, onClose, onEnd }) {
+function CoopRound({ workshop, assignment, route, participantCount, isHost, onSubmit, onExpire, onClose, onEnd }) {
   const card = CARDS.find((item) => item.id === assignment.card_id)
   const [sparkState, setSparkState] = useState(null)
   const [draft, setDraft] = useState('')
@@ -1105,6 +1218,12 @@ function CoopRound({ workshop, assignment, participantCount, isHost, onSubmit, o
         cardProvocation: card.provocation,
         cardSparkBrief: card.sparkBrief,
         previousTransformations: [],
+        routeId: route?.id,
+        routeName: route?.name,
+        routePurpose: route?.purpose,
+        routeStep: route ? workshop.round_number : undefined,
+        routeLength: route?.cardIds.length,
+        previousRouteResponses: [],
       }, force)
       setSparkState({ cardId: card.id, loading: false, sparks, error: null })
     } catch (sparkError) {
@@ -1176,7 +1295,7 @@ function CoopRound({ workshop, assignment, participantCount, isHost, onSubmit, o
   if (submitted) {
     return (
       <section className="coop-round-waiting">
-        <CoopRoundTrack current={workshop.round_number} target={workshop.target_rounds} />
+        <CoopRoundTrack current={workshop.round_number} target={workshop.target_rounds} route={route} />
         <div className={`coop-folded-card category-${card.category}`}><CardIcon id={card.id} /><span>Pass complete</span></div>
         <h1>Folded and passed on.</h1>
         <p className="coop-pass-saved" role="status"><b aria-hidden="true">✓</b> Your change is saved in the pile.</p>
@@ -1190,7 +1309,7 @@ function CoopRound({ workshop, assignment, participantCount, isHost, onSubmit, o
     <section className={`coop-round-page ${postItPinned ? 'is-post-it-pinned' : ''}`}>
       <header className="coop-round-heading">
         <div><p className="eyebrow">Pass {workshop.round_number} of {workshop.target_rounds}</p><h1>A new idea<br />has landed.</h1></div>
-        <CoopRoundTrack current={workshop.round_number} target={workshop.target_rounds} />
+        <CoopRoundTrack current={workshop.round_number} target={workshop.target_rounds} route={route} />
       </header>
       <div className="coop-play-space">
         <CoopPostIt idea={assignment.source_text} />
@@ -1214,10 +1333,10 @@ function CoopRound({ workshop, assignment, participantCount, isHost, onSubmit, o
   )
 }
 
-function CoopBetween({ workshop, participantCount, isHost, busy, onNext, onEnd }) {
+function CoopBetween({ workshop, route, participantCount, isHost, busy, onNext, onEnd }) {
   return (
     <section className="coop-between">
-      <CoopRoundTrack current={workshop.round_number + 1} target={workshop.target_rounds} />
+      <CoopRoundTrack current={workshop.round_number + 1} target={workshop.target_rounds} route={route} />
       <div className="coop-between-pile" aria-hidden="true"><i /><i /><i /><i /></div>
       <p className="eyebrow">Pass {workshop.round_number} complete · {workshop.submitted_count} of {participantCount} responses</p>
       <h1>No peeking yet</h1>
@@ -1229,7 +1348,7 @@ function CoopBetween({ workshop, participantCount, isHost, busy, onNext, onEnd }
   )
 }
 
-function CoopReveal({ idea, assignments, participantById, targetRounds, onLeave }) {
+function CoopReveal({ idea, assignments, participantById, targetRounds, route, onLeave }) {
   const responses = assignments.filter((assignment) => assignment.response).sort((a, b) => a.round_number - b.round_number)
   const [copied, setCopied] = useState(false)
   const [postItPinned, setPostItPinned] = useState(false)
@@ -1253,19 +1372,20 @@ function CoopReveal({ idea, assignments, participantById, targetRounds, onLeave 
   const copy = async () => {
     const text = [
       `ORIGINAL IDEA\n${idea.body}`,
+      route ? `ROUTE\n${route.name}` : null,
       ...responses.map((assignment) => {
         const card = CARDS.find((item) => item.id === assignment.card_id)
         const person = participantById.get(assignment.participant_id)
         return `PASS ${assignment.round_number} — ${card.title} — ${person?.display_name || 'Anonymous'}\nQUESTION: ${card.provocation}\nCHANGE: ${assignment.response}`
       }),
-    ].join('\n\n')
+    ].filter(Boolean).join('\n\n')
     await writeClipboard(text)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 2200)
   }
   return (
     <section className={`coop-reveal ${postItPinned ? 'is-post-it-pinned' : ''}`}>
-      <header className="coop-reveal-heading"><div><p className="eyebrow">Your idea is back</p><h1>See what happened<br /><em>while it was away.</em></h1></div></header>
+      <header className="coop-reveal-heading"><div><p className="eyebrow">{route ? `${route.name} · complete` : 'Your idea is back'}</p><h1>See what happened<br /><em>while it was away.</em></h1></div></header>
       <CoopPostIt idea={idea.body} label="Where it started" compact />
       <div className="coop-reveal-grid">
         {Array.from({ length: targetRounds }, (_, index) => {
