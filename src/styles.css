@@ -603,9 +603,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: .5;
-  background-image: radial-gradient(rgba(23,23,19,.13) .65px, transparent .7px);
-  background-size: 17px 17px;
+  background-image: radial-gradient(circle, rgba(145, 116, 177, .56) 1.15px, transparent 1.4px);
+  background-size: 22px 22px;
 }
 .tabletop-canvas { position: relative; width: 100%; height: calc(100svh - 74px); min-height: 560px; }
 .tabletop-progress {
