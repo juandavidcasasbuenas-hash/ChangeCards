@@ -16,6 +16,12 @@ import {
 
 const COMPACT_TABLE_QUERY = '(max-width: 820px)'
 
+function deckTargetRect(deck) {
+  if (!deck) return null
+  if (window.matchMedia(COMPACT_TABLE_QUERY).matches) return deck.querySelector('.draw-card-button')?.getBoundingClientRect() || null
+  return deck.getBoundingClientRect()
+}
+
 const CARDS = [
   { id: 1, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'Borrow a Brain', provocation: 'How would someone from a completely different field solve this?' },
   { id: 2, category: 'multidisciplinary', label: 'Being multidisciplinary', title: 'The Wrong Expert', provocation: 'Who has absolutely no business solving this — and what might they notice?' },
@@ -1971,6 +1977,30 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   const [mobileRearranging, setMobileRearranging] = useState(false)
   const [dealFlight, setDealFlight] = useState(null)
   const [routesOpen, setRoutesOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreActionsRef = useRef(null)
+  const moreButtonRef = useRef(null)
+  useEffect(() => {
+    if (!moreOpen) return undefined
+    const dismiss = (event) => {
+      if (!moreActionsRef.current?.contains(event.target)) setMoreOpen(false)
+    }
+    const escape = (event) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setMoreOpen(false)
+      moreButtonRef.current?.focus({ preventScroll: true })
+    }
+    const resize = () => { if (!window.matchMedia(COMPACT_TABLE_QUERY).matches) setMoreOpen(false) }
+    document.addEventListener('pointerdown', dismiss)
+    document.addEventListener('keydown', escape)
+    window.addEventListener('resize', resize)
+    return () => {
+      document.removeEventListener('pointerdown', dismiss)
+      document.removeEventListener('keydown', escape)
+      window.removeEventListener('resize', resize)
+    }
+  }, [moreOpen])
   const [routeArrivalIds, setRouteArrivalIds] = useState(() => new Set())
   const [leavingRoute, setLeavingRoute] = useState(null)
   const [routeCelebration, setRouteCelebration] = useState(false)
@@ -2164,7 +2194,8 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
     const artworkStyles = {}
     try {
       const canvas = canvasRef.current?.getBoundingClientRect()
-      const deck = deckRef.current?.querySelector('.deck-stack')?.getBoundingClientRect()
+      const deckStack = deckRef.current?.querySelector('.deck-stack')
+      const deck = deckStack?.getClientRects().length ? deckStack.getBoundingClientRect() : deckTargetRect(deckRef.current)
       const target = canvasRef.current?.querySelector(`[data-card-id="${pending.id}"]`)?.getBoundingClientRect()
       if (canvas && deck) {
         if (target?.width && target?.height) {
@@ -2221,12 +2252,14 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
   }, [dealtCardIds])
 
   function dealAll() {
+    setMoreOpen(false)
     if (!remainingCards.length) return
     if (coachStep === 'deck') setCoachStep('card')
     update({ dealtCardIds: [...CARDS].sort((a, b) => ['multidisciplinary', 'ingenious', 'optimistic', 'flexible'].indexOf(a.category) - ['multidisciplinary', 'ingenious', 'optimistic', 'flexible'].indexOf(b.category) || a.id - b.id).map((card) => card.id), cardPositions: {}, activeRouteId: null })
   }
 
   function clearUnused() {
+    setMoreOpen(false)
     const keptCardIds = dealtCardIds.filter((cardId) => notes[cardId]?.visited || session.drafts?.[cardId]?.trim())
     if (keptCardIds.length === dealtCardIds.length) return
     const keptCardSet = new Set(keptCardIds)
@@ -2461,22 +2494,6 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
         {ideaPinned && <p className="pinned-starting-idea">{session.idea}</p>}
         <div className="deal-controls">
           <button className="deck-control-button draw-card-button" type="button" onClick={dealOne} disabled={!remainingCards.length || Boolean(dealFlight)}><span className="deck-control-icon is-draw"><DrawCardIcon /></span><span className="deck-control-label">Draw a card</span></button>
-          <button className="deck-control-button deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>
-            <span className="deck-control-icon is-deal"><DealAllIcon /></span>
-            <span className="deck-control-label">Deal all 40</span>
-          </button>
-          {hasUnusedDealtCards && (
-            <button
-              className="deck-control-button clear-unused-button"
-              type="button"
-              onClick={clearUnused}
-              disabled={Boolean(dealFlight)}
-              aria-label="Return every unused card to the deck"
-            >
-              <span className="deck-control-icon is-return"><ReturnCardsIcon /></span>
-              <span className="deck-control-label">Clear unused</span>
-            </button>
-          )}
           <button
             ref={routesButtonRef}
             className={`deck-control-button routes-button ${routesOpen ? 'is-open' : ''}`}
@@ -2484,11 +2501,36 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
             aria-expanded={routesOpen}
             aria-controls="curated-routes"
             disabled={Boolean(dealFlight)}
-            onClick={() => setRoutesOpen((open) => !open)}
+            onClick={() => { setMoreOpen(false); setRoutesOpen((open) => !open) }}
           >
             <span className="deck-control-icon is-route"><RouteIcon /></span>
-            <span className="deck-control-label">Guided routes</span>
+            <span className="deck-control-label desktop-control-label">Guided routes</span><span className="deck-control-label mobile-control-label">Routes</span>
           </button>
+          <div className={`secondary-table-actions ${moreOpen ? 'is-open' : ''}`} ref={moreActionsRef} onBlur={(event) => {
+            if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setMoreOpen(false)
+          }}>
+            <button ref={moreButtonRef} className="table-actions-toggle" type="button" aria-expanded={moreOpen} aria-controls="more-table-actions" onClick={() => setMoreOpen((open) => !open)}>
+              More <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 10 4-4 4 4" /></svg>
+            </button>
+            <div id="more-table-actions" className="table-actions-popover" role="group" aria-label="More table actions">
+              <button className="deck-control-button deal-all-button" onClick={dealAll} disabled={!remainingCards.length || Boolean(dealFlight)}>
+                <span className="deck-control-icon is-deal"><DealAllIcon /></span>
+                <span className="deck-control-label">Deal all 40</span>
+              </button>
+              {hasUnusedDealtCards && (
+                <button
+                  className="deck-control-button clear-unused-button"
+                  type="button"
+                  onClick={clearUnused}
+                  disabled={Boolean(dealFlight)}
+                  aria-label="Return every unused card to the deck"
+                >
+                  <span className="deck-control-icon is-return"><ReturnCardsIcon /></span>
+                  <span className="deck-control-label">Clear unused</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </aside>
         <aside className="mobile-idea-summary" aria-label="Your starting idea"><p>{session.idea}</p></aside>
@@ -2831,7 +2873,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
     }
     drag.current.latest = next
     setLocalPosition(next)
-    const deck = deckRef.current?.getBoundingClientRect()
+    const deck = deckTargetRect(deckRef.current)
     const insideDeck = Boolean(deck && event.clientX >= deck.left - 12 && event.clientX <= deck.right + 12 && event.clientY >= deck.top - 12 && event.clientY <= deck.bottom + 12)
     if (insideDeck !== overDeck.current) {
       overDeck.current = insideDeck
@@ -2842,7 +2884,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
   function pointerUp(event) {
     if (!drag.current) return
     const wasDragged = dragged.current
-    const deck = deckRef.current?.getBoundingClientRect()
+    const deck = deckTargetRect(deckRef.current)
     const releasedOnDeck = Boolean(deck && event && event.clientX >= deck.left - 12 && event.clientX <= deck.right + 12 && event.clientY >= deck.top - 12 && event.clientY <= deck.bottom + 12)
     const shouldReturn = wasDragged && (overDeck.current || releasedOnDeck)
     if (shouldReturn) onReturn()
@@ -2954,7 +2996,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
     }
     syncMobileDragOffset()
 
-    const deck = deckRef.current?.getBoundingClientRect()
+    const deck = deckTargetRect(deckRef.current)
     const insideDeck = Boolean(deck && event.clientX >= deck.left - 14 && event.clientX <= deck.right + 14 && event.clientY >= deck.top - 14 && event.clientY <= deck.bottom + 14)
     if (insideDeck !== overDeck.current) {
       overDeck.current = insideDeck
@@ -2994,7 +3036,7 @@ function DraggableTableCard({ card, index, previousCardId, nextCardId, canvasRef
 
     const clientX = event?.clientX ?? current.clientX
     const clientY = event?.clientY ?? current.clientY
-    const deck = deckRef.current?.getBoundingClientRect()
+    const deck = deckTargetRect(deckRef.current)
     const releasedOnDeck = Boolean(deck && clientX >= deck.left - 14 && clientX <= deck.right + 14 && clientY >= deck.top - 14 && clientY <= deck.bottom + 14)
     if (!cancelled && current.activated && (overDeck.current || releasedOnDeck)) {
       onReturn()

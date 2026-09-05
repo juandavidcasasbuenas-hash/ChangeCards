@@ -57,7 +57,7 @@ try {
   await screenshot('04-table-desktop')
   await page.setViewport({ width: 390, height: 844 })
   await screenshot('05-table-mobile')
-  assert.equal(await page.evaluate(() => document.querySelector('.side-deck').getBoundingClientRect().bottom <= document.querySelector('.mobile-idea-summary').getBoundingClientRect().top), true, 'Mobile controls overlap content')
+  assert.equal(await page.evaluate(() => document.querySelector('.mobile-idea-summary').getBoundingClientRect().bottom < document.querySelector('.side-deck').getBoundingClientRect().top), true, 'Mobile idea overlaps the bottom dock')
   await page.click('.draw-card-button')
   await page.waitForSelector('.table-card-shell:not(.deal-flight-card)')
   await settle()
