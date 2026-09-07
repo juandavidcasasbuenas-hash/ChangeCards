@@ -684,7 +684,7 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
       <section className="entry-content">
         <div className="entry-copy">
           <h1><span>Push an idea</span>{' '}<span className="entry-title-accent">somewhere</span>{' '}<span>unexpected.</span></h1>
-          <p className="entry-description"><span>Use 40 creative prompts to explore new directions.</span>{' '}<span>Pick a card, change one detail, save the idea.</span></p>
+
         </div>
 
         <div className="entry-workspace">
@@ -2465,7 +2465,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
 
   return (
     <section
-      className={`tabletop ${!layoutRoute && dealtCardIds.length ? 'is-arranged' : ''} ${!dealtCardIds.length ? 'is-empty-table' : ''} ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${hasUnusedDealtCards ? 'has-unused-cards' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
+      className={`tabletop ${!layoutRoute ? 'is-arranged' : ''} ${!dealtCardIds.length ? 'is-empty-table' : ''} ${dealtCardIds.length > TABLE_CARD_POSITIONS.length ? 'is-dense' : ''} ${hasUnusedDealtCards ? 'has-unused-cards' : ''} ${mobileRearranging ? 'is-rearranging' : ''} ${tableScrolled ? 'has-scrolled' : ''} ${activeRoute ? 'has-active-route' : ''} ${leavingRoute ? 'is-route-leaving' : ''}`}
       aria-label="Change Cards idea table"
       onScroll={(event) => setTableScrolled(event.currentTarget.scrollTop > 32)}
     >
@@ -2540,11 +2540,6 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
 
       <div className="tabletop-canvas" ref={canvasRef} style={{ '--arranged-height': `${arrangement.height}px`, '--arranged-card-width': `${arrangement.cardWidth}px`, '--note-x': `${arrangement.noteX}px`, '--note-y': `${arrangement.noteY}px`, '--note-width': `${arrangement.noteWidth}px`, '--note-height': `${arrangement.noteHeight}px` }}>
         <OriginalNote idea={session.idea} />
-        {!dealtCardIds.length && <section className="table-welcome">
-          <h2>One card.<br /><em>A different possibility.</em></h2>
-          <p>Draw a prompt and see where it takes you, or follow four cards with a shared purpose.</p>
-          <div><button className="ink-button" type="button" onClick={dealOne} disabled={Boolean(dealFlight)}>Draw my first card ↗</button><button className="text-button" type="button" onClick={() => setRoutesOpen(true)}>Follow a guided route →</button></div>
-        </section>}
 
         {routesOpen && (
           <button
