@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Analytics } from '@vercel/analytics/react'
+import DesignPhase from './components/DesignPhase.jsx'
 import {
   closeCurrentRound,
   createWorkshop,
@@ -667,7 +668,7 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
   }
 
   return (
-    <main className="entry-page">
+    <main className="entry-page entry-landing-page">
       <div className="entry-grain" aria-hidden="true" />
       <div className="entry-doodle-wallpaper" aria-hidden="true">
         {CARD_ICON_FILES.map((filename) => (
@@ -679,12 +680,19 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
       </div>
       <header className="entry-mark">
         <Logo />
+        <DesignPhase stage="develop" />
       </header>
 
       <section className="entry-content">
         <div className="entry-copy">
           <h1><span>Push an idea</span>{' '}<span className="entry-title-accent">somewhere</span>{' '}<span>unexpected.</span></h1>
-
+          <div className="entry-card-fan" aria-hidden="true">
+            {[CARDS[0], CARDS[13], CARDS[4]].map((card, index) => (
+              <div className={`entry-preview-card category-${card.category}`} key={card.id} style={{ '--preview-tilt': `${[-14, 2, 16][index]}deg` }}>
+                <div className="card-front"><CardArtwork card={card} /></div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="entry-workspace">
@@ -721,7 +729,7 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
                 <p className="eyebrow">Your table is still here</p>
                 <h2>{session.idea}</h2>
                 <p>{savedCount} saved {savedCount === 1 ? 'idea' : 'ideas'} · {draftCount} unfinished {draftCount === 1 ? 'draft' : 'drafts'}</p>
-                <button className="ink-button" type="button" onClick={onResume}>Return to my table →</button>
+                <button className="ink-button" type="button" onClick={onResume}><span>Return to my table</span><span aria-hidden="true">→</span></button>
                 <button className="text-button" type="button" onClick={onNew}>Start a new idea</button>
               </section>
             ) : playMode === 'coop' && coopChoice === 'join' ? (
@@ -746,15 +754,17 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
                   <span id="idea-example-description" className="sr-only">Enter your own idea, or select Try an example to use the suggestion shown here.</span>
                   {draft && <span className="character-count">{draft.length} / 1000</span>}
                 </div>
-                <div className="entry-input-help"><button type="button" className="try-example" onClick={() => setDraft(ideaExample)}>Try an example <span className="example-spark" aria-hidden="true">✦</span></button></div>
-                {playMode === 'coop' && <button className="ink-button entry-create-choice" type="submit">Create room →</button>}
+                {playMode === 'coop' && <button className="ink-button entry-create-choice" type="submit"><span>Create room</span><span aria-hidden="true">→</span></button>}
               </>
             )}
             {entryError && <p className="entry-error" role="alert">{entryError}</p>}
             {playMode === 'solo' && !canResume && (
               <button className="ink-button" type="submit" disabled={!draft.trim()}>
-                Start solo
+                <span>Start solo</span><span aria-hidden="true">→</span>
               </button>
+            )}
+            {((playMode === 'solo' && !canResume) || (playMode === 'coop' && coopChoice === 'create')) && (
+              <div className="entry-input-help"><button type="button" className="try-example" onClick={() => setDraft(ideaExample)}>Try an example <span className="example-spark" aria-hidden="true">✦</span></button></div>
             )}
           </form>
         </div>

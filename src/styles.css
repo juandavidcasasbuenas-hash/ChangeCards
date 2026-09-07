@@ -26,6 +26,10 @@
   --focus-ring: #4e7090;
   --display-font: 'DM Sans', sans-serif;
   --mono-font: 'DM Mono', monospace;
+  --landing-width: 1328px;
+  --landing-display-size: clamp(52px, 6.3vw, 92px);
+  --landing-gap: clamp(48px, 7vw, 110px);
+  --landing-panel-padding: 32px;
   --content-width: 1280px;
   --gutter: clamp(20px, 4vw, 60px);
   --radius-control: 10px;
@@ -153,6 +157,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 
 .logo span:last-child { margin-left: 17px; }
+
+.design-phase { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font: 400 10px/1.4 var(--mono-font); letter-spacing: .12em; text-transform: uppercase; }
+.design-phase svg { flex-shrink: 0; }
 
 .entry-content {
   position: relative;
