@@ -683,11 +683,11 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
 
       <section className="entry-content">
         <div className="entry-copy">
-          <h1>Push an idea<br /><em>somewhere unexpected.</em></h1>
-          <p className="entry-description">Use 40 creative prompts to explore new directions. Pick a card, change one detail, save the idea.</p>
+          <h1><span>Push an idea</span>{' '}<span className="entry-title-accent">somewhere</span>{' '}<span>unexpected.</span></h1>
+          <p className="entry-description"><span>Use 40 creative prompts to explore new directions.</span>{' '}<span>Pick a card, change one detail, save the idea.</span></p>
         </div>
 
-        <form className="idea-form" onSubmit={submit}>
+        <div className="entry-workspace">
           <fieldset className="entry-mode-switch">
             <legend className="sr-only">Play mode</legend>
             <div className="entry-mode-toggle">
@@ -709,53 +709,55 @@ function Entry({ session, update, onResume, onNew, onEnterRoom, onOpenPrivacy })
               </button>
             </div>
           </fieldset>
-          {playMode === 'coop' && (
-            <div className="coop-entry-choices" role="group" aria-label="Host or join">
-              <button type="button" aria-pressed={coopChoice === 'create'} onClick={() => { setCoopChoice('create'); setEntryError('') }}>Host a room</button>
-              <button type="button" aria-pressed={coopChoice === 'join'} onClick={() => { setCoopChoice('join'); setEntryError('') }}>Join a room</button>
-            </div>
-          )}
-          {canResume && playMode === 'solo' ? (
-            <section className="resume-session" aria-label="Your saved table">
-              <p className="eyebrow">Your table is still here</p>
-              <h2>{session.idea}</h2>
-              <p>{savedCount} saved {savedCount === 1 ? 'idea' : 'ideas'} · {draftCount} unfinished {draftCount === 1 ? 'draft' : 'drafts'}</p>
-              <button className="ink-button" type="button" onClick={onResume}>Return to my table →</button>
-              <button className="text-button" type="button" onClick={onNew}>Start a new idea</button>
-            </section>
-          ) : playMode === 'coop' && coopChoice === 'join' ? (
-            <fieldset className="entry-room-actions">
-              <legend>Have an invitation?</legend>
-              <p>Enter your six-character room code. You’ll add your idea once you’re in.</p>
-              <div className="entry-join-choice">
-                <label className="sr-only" htmlFor="entry-room-code">Room code</label>
-                <input id="entry-room-code" type="text" value={roomCodeDraft} maxLength={6}
-                  onChange={(event) => setRoomCodeDraft(event.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ''))}
-                  onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); beginJoiningRoom() } }}
-                  placeholder="e.g. ABC234" autoComplete="off" autoCapitalize="characters" spellCheck="false" />
-                <button type="button" onClick={beginJoiningRoom} disabled={roomCodeDraft.length !== 6}>Join room →</button>
+          <form className="idea-form" onSubmit={submit}>
+            {playMode === 'coop' && (
+              <div className="coop-entry-choices" role="group" aria-label="Host or join">
+                <button type="button" aria-pressed={coopChoice === 'create'} onClick={() => { setCoopChoice('create'); setEntryError('') }}>Host a room</button>
+                <button type="button" aria-pressed={coopChoice === 'join'} onClick={() => { setCoopChoice('join'); setEntryError('') }}>Join a room</button>
               </div>
-            </fieldset>
-          ) : (
-            <>
-              <label htmlFor="idea">What are you working on?</label>
-              <div className="idea-input-wrap">
-                <textarea id="idea" value={draft} maxLength={1000} onChange={(event) => setDraft(event.target.value)}
-                  placeholder="An idea, a challenge, or something you’d like to change…" aria-describedby="idea-example-description" />
-                <span id="idea-example-description" className="sr-only">Use Try an example if you need a starting point.</span>
-                {draft && <span className="character-count">{draft.length} / 1000</span>}
-              </div>
-              <div className="entry-input-help"><button type="button" className="try-example" onClick={() => setDraft(ideaExample)}>Try an example ↗</button></div>
-              {playMode === 'coop' && <button className="ink-button entry-create-choice" type="submit">Create room →</button>}
-            </>
-          )}
-          {entryError && <p className="entry-error" role="alert">{entryError}</p>}
-          {playMode === 'solo' && !canResume && (
-            <button className="ink-button" type="submit" disabled={!draft.trim()}>
-              Start solo
-            </button>
-          )}
-        </form>
+            )}
+            {canResume && playMode === 'solo' ? (
+              <section className="resume-session" aria-label="Your saved table">
+                <p className="eyebrow">Your table is still here</p>
+                <h2>{session.idea}</h2>
+                <p>{savedCount} saved {savedCount === 1 ? 'idea' : 'ideas'} · {draftCount} unfinished {draftCount === 1 ? 'draft' : 'drafts'}</p>
+                <button className="ink-button" type="button" onClick={onResume}>Return to my table →</button>
+                <button className="text-button" type="button" onClick={onNew}>Start a new idea</button>
+              </section>
+            ) : playMode === 'coop' && coopChoice === 'join' ? (
+              <fieldset className="entry-room-actions">
+                <legend>Have an invitation?</legend>
+                <p>Enter your six-character room code. You’ll add your idea once you’re in.</p>
+                <div className="entry-join-choice">
+                  <label className="sr-only" htmlFor="entry-room-code">Room code</label>
+                  <input id="entry-room-code" type="text" value={roomCodeDraft} maxLength={6}
+                    onChange={(event) => setRoomCodeDraft(event.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ''))}
+                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); beginJoiningRoom() } }}
+                    placeholder="e.g. ABC234" autoComplete="off" autoCapitalize="characters" spellCheck="false" />
+                  <button type="button" onClick={beginJoiningRoom} disabled={roomCodeDraft.length !== 6}>Join room →</button>
+                </div>
+              </fieldset>
+            ) : (
+              <>
+                <label htmlFor="idea">What are you working on?</label>
+                <div className="idea-input-wrap">
+                  <textarea id="idea" value={draft} maxLength={1000} onChange={(event) => setDraft(event.target.value)}
+                    placeholder={ideaExample} aria-describedby="idea-example-description" />
+                  <span id="idea-example-description" className="sr-only">Enter your own idea, or select Try an example to use the suggestion shown here.</span>
+                  {draft && <span className="character-count">{draft.length} / 1000</span>}
+                </div>
+                <div className="entry-input-help"><button type="button" className="try-example" onClick={() => setDraft(ideaExample)}>Try an example <span className="example-spark" aria-hidden="true">✦</span></button></div>
+                {playMode === 'coop' && <button className="ink-button entry-create-choice" type="submit">Create room →</button>}
+              </>
+            )}
+            {entryError && <p className="entry-error" role="alert">{entryError}</p>}
+            {playMode === 'solo' && !canResume && (
+              <button className="ink-button" type="submit" disabled={!draft.trim()}>
+                Start solo
+              </button>
+            )}
+          </form>
+        </div>
       </section>
 
       <ProjectCredit compact appFooter onOpenPrivacy={onOpenPrivacy} />

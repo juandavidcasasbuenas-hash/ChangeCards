@@ -1,6 +1,5 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import 'charter-webfont/charter.css'
 import App from './App.jsx'
 import './styles.css'
 import './ux.css'
