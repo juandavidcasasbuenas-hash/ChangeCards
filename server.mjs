@@ -1,4 +1,5 @@
 import express from 'express'
+import feedback from './lib/feedback.mjs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import 'dotenv/config'
@@ -12,6 +13,7 @@ app.use(express.json({ limit: '32kb' }))
 app.get('/api/health', health)
 app.post('/api/transform', transform)
 app.post('/api/sparks', sparks)
+app.post('/api/feedback', feedback)
 
 const dist = path.join(__dirname, 'dist')
 if (process.env.VERCEL !== '1' && process.env.VERCEL !== 'true') {

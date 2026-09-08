@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Analytics } from '@vercel/analytics/react'
 import DesignPhase from './components/DesignPhase.jsx'
+import { FeedbackButton, FeedbackProvider } from './components/Feedback.jsx'
 import {
   closeCurrentRound,
   createWorkshop,
@@ -1543,7 +1544,7 @@ function PrivacyNotice({ open, onClose }) {
       <article className="privacy-sheet" ref={sheetRef}>
         <header className="privacy-heading">
           <div>
-            <p className="eyebrow">Privacy notice · 1 September 2026</p>
+            <p className="eyebrow">Privacy notice · 8 September 2026</p>
             <h1 id="privacy-title">How your ideas<br /><em>are handled.</em></h1>
           </div>
           <button className="privacy-close" ref={closeRef} type="button" onClick={onClose} aria-label="Close privacy notice">×</button>
@@ -1570,6 +1571,11 @@ function PrivacyNotice({ open, onClose }) {
           </section>
 
           <section>
+            <h2>Feedback</h2>
+            <p>If you send feedback, your message, optional email address, current screen and app version are stored in Supabase and emailed to Juan through Resend. Your idea and card contents are not included automatically. A hashed network address is stored to limit spam. Feedback remains until the operator deletes it.</p>
+          </section>
+
+          <section>
             <h2>Optional AI</h2>
             <p>When you request a Spark or generated option, the current idea, selected Change Card and recent workshop context are sent through the Change Cards server to OpenAI.</p>
             <p>OpenAI states that API inputs and outputs are not used to train its models by default. Default abuse-monitoring logs may be retained for up to 30 days. <a href="https://platform.openai.com/docs/models/default-usage-policies-by-endpoint" target="_blank" rel="noreferrer">OpenAI data controls ↗</a></p>
@@ -1577,7 +1583,7 @@ function PrivacyNotice({ open, onClose }) {
 
           <section>
             <h2>Purpose, storage and sharing</h2>
-            <p>The information is used only to provide, secure and understand the use of Change Cards, relying on legitimate interests in operating and improving the workshop. It is not sold or used for advertising. Supabase, Vercel and OpenAI act as service providers and may process information outside the UK under their contractual safeguards.</p>
+            <p>The information is used only to provide, secure and understand the use of Change Cards, relying on legitimate interests in operating and improving the workshop. It is not sold or used for advertising. Supabase, Vercel, Resend and OpenAI act as service providers and may process information outside the UK under their contractual safeguards.</p>
             <p>Co-op room records and anonymous accounts do not currently expire automatically; they remain in Supabase until the operator deletes them.</p>
           </section>
 
@@ -1600,8 +1606,10 @@ function PrivacyNotice({ open, onClose }) {
 function ProjectCredit({ compact = false, appFooter = false, hidden = false, privacyOnly = false, onOpenPrivacy }) {
   if (privacyOnly) {
     return (
-      <aside className={`project-credit is-privacy-only ${compact ? 'is-compact' : ''} ${appFooter ? 'is-app-footer' : ''}`} aria-label="Privacy">
+      <aside className={`project-credit is-privacy-only ${compact ? 'is-compact' : ''} ${appFooter ? 'is-app-footer' : ''}`} aria-label="Privacy and feedback">
         <button className="privacy-link" type="button" onClick={onOpenPrivacy}>Privacy</button>
+        <i className="credit-separator" aria-hidden="true">·</i>
+        <FeedbackButton className="privacy-link" />
       </aside>
     )
   }
@@ -1613,6 +1621,8 @@ function ProjectCredit({ compact = false, appFooter = false, hidden = false, pri
       <span className="credit-context">Inspired by <a href="https://www.gov.uk/guidance/open-policy-making-toolkit/testing-and-improving-policy-ideas" target="_blank" rel="noreferrer">Policy Lab’s Change Cards</a></span>
       <i className="credit-separator credit-privacy-separator" aria-hidden="true">·</i>
       <button className="privacy-link" type="button" onClick={onOpenPrivacy}>Privacy</button>
+      <i className="credit-separator" aria-hidden="true">·</i>
+      <FeedbackButton className="privacy-link" />
     </aside>
   )
 }
@@ -3779,4 +3789,6 @@ function FavouriteTray({ favourites, onClose }) {
   )
 }
 
-export default App
+export default function ChangeCardsApp() {
+  return <FeedbackProvider><App /></FeedbackProvider>
+}
