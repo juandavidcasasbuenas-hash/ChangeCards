@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "safari": "node scripts/evidence-safari.mjs",
+    "test:safari": "node --test tests/*safari*.test.mjs",
+    "verify:safari": "node scripts/verify-safari.mjs",
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:web\"",
     "dev:web": "vite",
     "dev:server": "node --watch server.mjs",
@@ -18,14 +21,15 @@
     "verify:coop:live": "node scripts/verify-coop-live.mjs"
   },
   "dependencies": {
-    "@vercel/analytics": "^2.0.1",
     "@supabase/supabase-js": "^2.112.4",
+    "@vercel/analytics": "^2.0.1",
     "charter-webfont": "^4.1.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
     "openai": "^5.20.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tldraw": "^5.4.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.2",

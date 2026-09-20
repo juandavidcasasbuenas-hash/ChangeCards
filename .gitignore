@@ -1,4 +1,7 @@
 node_modules/
+.cache/evidence-safari/
+.cache/evidence-safari-art/
+.cache/evidence-safari-web/
 dist/
 .DS_Store
 .env
@@ -7,6 +10,7 @@ dist/
 OpenAI.txt
 OpenAi.txt
 openAI.txt
+jev.txt
 npm-debug.log*
 verification-*.png
 supabase/.temp/
