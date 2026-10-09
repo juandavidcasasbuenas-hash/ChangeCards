@@ -4,12 +4,12 @@ import fs from 'node:fs'
 import { Box, ArrowShapeUtil, TextShapeUtil, toRichText } from 'tldraw'
 import { createTLSchema, defaultBindingSchemas, defaultShapeSchemas, DocumentRecordType, PageRecordType } from '@tldraw/tlschema'
 import { CARDS, CURATED_ROUTES } from '../src/develop/catalog.js'
-import { templateShapes, stationShapes, changeCardProps, workingPosition, DEVELOP_X, CATALOGUE_X, CARD_W, WORKSPACE_W } from '../src/develop/model.js'
+import { templateShapes, stationShapes, deckShapes, deckPosition, changeCardProps, workingPosition, DEVELOP_X, CATALOGUE_X, CARD_W, WORKSPACE_W } from '../src/develop/model.js'
 import { buildSparkPayload, sparkCacheKey } from '../src/develop/ai.js'
 import { evidencePayload, richTextPlainText } from '../src/safari/field-table/canvas-model.js'
 import { safariShapeSchemas } from '../shared/safari-shapes.mjs'
 import { MAX_RECORD_BYTES, prepareSharedBoard } from '../shared/safari-session.mjs'
-import { initializeDevelop, buildFromEvidence, collectDevelopEntries, drawChangeCard, activateRoute, getRouteState, nextRouteCard, showRoute, leaveRoute, showDevelop, developMarkdown } from '../src/develop/canvas-actions.js'
+import { initializeDevelop, getDeckShapes, getDeckState, drawFromDeck, buildFromEvidence, collectDevelopEntries, drawChangeCard, activateRoute, getRouteState, nextRouteCard, showRoute, leaveRoute, showDevelop, developMarkdown } from '../src/develop/canvas-actions.js'
 
 const evidence = JSON.parse(fs.readFileSync(new URL('../public/safari/example/workshop.json', import.meta.url)))
 const schema = createTLSchema({ shapes: { ...defaultShapeSchemas, ...safariShapeSchemas }, bindings: defaultBindingSchemas })
@@ -27,22 +27,23 @@ const legacy = () => ({
 function editorWith(initial = []) {
   const shapes = new Map(initial.map(shape => [shape.id, structuredClone({ meta: {}, ...shape })]))
   const bindings = new Map()
-  let page = { id: 'page:workshop', meta: {} }, readonly = false
+  let page = { id: 'page:workshop', meta: {} }, readonly = false, ignoreShapeLock = false
   const editor = {
     shapes, bindings, focusedBounds: null,
     getCurrentPage: () => page,
     getCurrentPageShapes: () => [...shapes.values()],
     getShape: id => shapes.get(id),
     getBinding: id => bindings.get(id),
+    getBindingsInvolvingShape: id => [...bindings.values()].filter(binding => binding.fromId === id || binding.toId === id),
     createBinding: binding => { bindings.set(binding.id, structuredClone(binding)); return editor },
     getInstanceState: () => ({ isReadonly: readonly }),
     setReadonly: value => { readonly = value },
-    run: callback => callback(),
+    run: (callback, options) => { const previous = ignoreShapeLock; ignoreShapeLock = options?.ignoreShapeLock ?? previous; try { return callback() } finally { ignoreShapeLock = previous } },
     createShape: shape => { shapes.set(shape.id, structuredClone({ meta: {}, parentId: page.id, ...shape })); return editor },
     createShapes: records => { records.forEach(editor.createShape); return editor },
     updatePage: patch => { page = { ...page, ...structuredClone(patch) }; return editor },
-    updateShape: patch => { const old = shapes.get(patch.id); shapes.set(patch.id, { ...old, ...patch, props: { ...old.props, ...patch.props } }); return editor },
-    deleteShape: id => { shapes.delete(id); for (const [key, binding] of bindings) if (binding.toId === id || binding.fromId === id) bindings.delete(key); return editor },
+    updateShape: patch => { const old = shapes.get(patch.id); if (old?.isLocked && !ignoreShapeLock && patch.isLocked !== false) return editor; shapes.set(patch.id, { ...old, ...patch, props: { ...old.props, ...patch.props } }); return editor },
+    deleteShape: id => { if (shapes.get(id)?.isLocked && !ignoreShapeLock) return editor; shapes.delete(id); for (const [key, binding] of bindings) if (binding.toId === id || binding.fromId === id) bindings.delete(key); return editor },
     deleteShapes: ids => { ids.forEach(editor.deleteShape); return editor },
     markHistoryStoppingPoint() {},
     getShapePageBounds: id => { const shape = shapes.get(id); return shape ? new Box(shape.x || 0, shape.y || 0, shape.props.w || 300, shape.props.h || 150) : null },
@@ -87,7 +88,7 @@ test('initializing a native board imports saved writing and drafts once; reopeni
 
 test('native Change Card catalogue records validate against the same schema used by the sync server', () => {
   const page = PageRecordType.create({ id: 'page:test', name: 'Workshop', index: 'a1' })
-  const templates = templateShapes(), stations = stationShapes()
+  const templates = templateShapes(), stations = [...stationShapes(), ...deckShapes().map(shape => ({ ...shape, id: `shape:deck-test-${shape.props.category}` }))]
   assert.equal(new Set(templates.map(shape => shape.props.cardId)).size, CARDS.length)
   assert.equal(new Set([...templates, ...stations].map(shape => shape.id)).size, templates.length + stations.length)
   for (const shape of [...templates, ...stations]) {
@@ -137,7 +138,7 @@ test('evidence-to-Develop keeps the original untouched and source limitations av
   assert.notEqual(sparkCacheKey(request), sparkCacheKey(other))
   assert.deepEqual(payload, original)
   initializeDevelop(editor, { challenge: evidence.challenge })
-  const working = collectDevelopEntries(editor).find(shape => shape.props.cardId === 14)
+  const working = editor.getShape(drawChangeCard(editor, 14, { author: { id: 'alex', name: 'Alex' } }))
   editor.updateShape({ id: working.id, props: { note: 'An hour over lunch.', draft: 'Next: test the time.', sparks: ['A six-person pilot'], authorName: 'Alex' } })
   const exported = developMarkdown(editor, evidence.challenge)
   for (const value of ['An hour over lunch.', 'Unfinished draft', 'Next: test the time.', 'Optional AI sparks', 'A six-person pilot', 'Alex']) assert.ok(exported.includes(value))
@@ -174,15 +175,35 @@ test('Your table includes untagged native annotations but excludes the catalogue
   assert.ok(focused.x + focused.w < CATALOGUE_X)
 })
 
-test('phone navigation keeps a working or category card readable; the whole catalogue remains an explicit overview', () => {
+test('Your cards focuses working ideas and annotations without decks or the starting challenge; an empty table returns to the piles', () => {
+  const editor = editorWith(), author = { id: 'alex', name: 'Alex' }
+  initializeDevelop(editor, { challenge: 'Make a useful workshop.' })
+  showDevelop(editor, 'cards', { animate: false })
+  assert.deepEqual(editor.focusedBounds, Box.Common(getDeckShapes(editor).map(shape => editor.getShapePageBounds(shape.id))))
+  const drawn = drawFromDeck(editor, undefined, { author, random: () => 0 }).shape
+  const annotation = { id: 'shape:my-sketch', type: 'draw', x: 7100, y: 950, props: { w: 180, h: 170 } }
+  editor.createShape(annotation)
+  const route = activateRoute(editor, CURATED_ROUTES[0].id, { author })
+  const before = structuredClone(editor.getCurrentPageShapes())
+  showDevelop(editor, 'cards', { animate: false })
+  const focused = editor.focusedBounds
+  assert.ok(focused.y >= drawn.y, 'the challenge and piles must not reduce the card scale')
+  for (const shape of [drawn, annotation, route.header, ...route.cards]) {
+    const bounds = editor.getShapePageBounds(shape.id)
+    assert.ok(focused.x <= bounds.x && focused.x + focused.w >= bounds.x + bounds.w)
+    assert.ok(focused.y <= bounds.y && focused.y + focused.h >= bounds.y + bounds.h)
+  }
+  assert.deepEqual(editor.getCurrentPageShapes(), before)
+})
+
+test('phone navigation keeps the selected deck readable; all decks remain an explicit overview', () => {
   const editor = editorWith()
   initializeDevelop(editor, { challenge: evidence.challenge })
   editor.getViewportScreenBounds = () => new Box(0, 0, 390, 844)
   for (const category of ['table', 'ingenious']) {
     showDevelop(editor, category, { animate: false })
     const focused = editor.focusedBounds
-    const target = editor.getCurrentPageShapes().find(shape => shape.type === 'change-card' &&
-      (category === 'table' ? !shape.props.template : shape.props.template && CARDS.find(card => card.id === shape.props.cardId).category === category))
+    const target = getDeckShapes(editor).find(shape => category === 'table' || shape.props.category === category)
     assert.deepEqual(focused, editor.getShapePageBounds(target.id))
   }
   showDevelop(editor, 'all', { animate: false })
@@ -192,6 +213,7 @@ test('phone navigation keeps a working or category card readable; the whole cata
 test('drawing after deletion or manual movement uses a vacant slot without moving existing cards; route lanes avoid existing work', () => {
   const editor = editorWith(), author = { id: 'alice', name: 'Alice' }
   initializeDevelop(editor, { challenge: evidence.challenge })
+  for (const cardId of [1, 5, 14]) drawChangeCard(editor, cardId, { author })
   const removed = collectDevelopEntries(editor).find(shape => shape.props.cardId === 5)
   editor.deleteShape(removed.id)
   const newId = drawChangeCard(editor, 6, { author })
@@ -230,7 +252,8 @@ test('legacy source-card findings can become native Develop evidence without lea
 test('shared participants get separate working copies while repeat draws preserve their own writing', () => {
   const editor = editorWith()
   initializeDevelop(editor, { challenge: evidence.challenge })
-  const starter = collectDevelopEntries(editor).find(shape => shape.props.cardId === 1)
+  editor.createShape({ id: 'shape:imported-unowned', type: 'change-card', ...workingPosition(0), props: changeCardProps(1) })
+  const starter = editor.getShape('shape:imported-unowned')
   const alice = { id: 'alice', name: 'Alice' }, bob = { id: 'bob', name: 'Bob' }
   const aliceId = drawChangeCard(editor, 1, { author: alice, reuseUnowned: false })
   const bobId = drawChangeCard(editor, 1, { author: bob, reuseUnowned: false })
@@ -370,6 +393,124 @@ test('retiring the old Develop scaffold preserves user-edited headings and other
     editor.updatePage({ meta: { developInitialized: true } })
     initializeDevelop(editor, { challenge: 'Workshop challenge' })
     assert.equal(Boolean(editor.getShape('shape:develop-heading')), text !== 'Room for a different idea.')
-    assert.equal(editor.getCurrentPageShapes().length, text === 'Room for a different idea.' ? 0 : 1)
+    assert.equal(editor.getCurrentPageShapes().length, text === 'Room for a different idea.' ? 4 : 5)
   }
+})
+
+test('a fresh Develop board starts with four native piles and no predealt cards or catalogue grid', () => {
+  const editor = editorWith()
+  initializeDevelop(editor, { challenge: 'Make more space for unexpected ideas.' })
+  assert.equal(collectDevelopEntries(editor).length, 0)
+  assert.equal(editor.getCurrentPageShapes().filter(shape => shape.props.template).length, 0)
+  assert.equal(getDeckShapes(editor).length, 4)
+  assert.equal(editor.getCurrentPage().meta.developDecksVersion, 1)
+  for (const deck of getDeckShapes(editor)) {
+    assert.deepEqual({ x: deck.x, y: deck.y }, deckPosition(deck.props.category))
+    assert.equal(deck.isLocked, true)
+    assert.equal(deck.props.w, 300)
+    assert.equal(deck.props.h, 430)
+    const state = getDeckState(editor, deck.props.category)
+    assert.equal(state.remaining.length, 10)
+    assert.equal(state.total, 10)
+    assert.equal(state.drawn, 0)
+    const record = schema.types.shape.create({ ...deck, parentId: editor.getCurrentPage().id, index: 'a1' })
+    assert.equal(schema.types.shape.validate(record), record)
+  }
+})
+
+test('catalogue migration removes pristine locked scaffolds while preserving modified cards, clones, notes and routes', () => {
+  const originalTemplates = templateShapes().map(shape => ({ ...shape, isLocked: true }))
+  const modified = originalTemplates.slice(0, 5).map((shape, index) => ({ ...shape,
+    ...(index === 0 ? { isLocked: false } : index === 1 ? { x: shape.x + 200 } : index === 2 ? { parentId: 'shape:my-group' } : {}),
+    props: { ...shape.props, ...(index === 3 ? { note: 'Our annotation' } : index === 4 ? { face: 'back' } : {}) },
+  }))
+  const clone = { ...originalTemplates[5], id: 'shape:my-template-copy', x: 7000 }
+  const oldStations = stationShapes().map(shape => ({ ...shape, isLocked: true }))
+  oldStations[0].x += 20
+  const editor = editorWith([...originalTemplates, ...modified, clone, ...oldStations])
+  editor.updatePage({ meta: { developInitialized: true, developRoute: CURATED_ROUTES[0].id, developOrder: ['shape:my-idea'] } })
+  const own = { id: 'shape:my-idea', type: 'change-card', x: 6925, y: 345,
+    props: changeCardProps(14, { note: 'Keep this thought.', draft: 'And this unfinished thought.' }), meta: { developDrafting: true } }
+  editor.createShape(own)
+  activateRoute(editor, CURATED_ROUTES[1].id, { author: { id: 'alex', name: 'Alex' } })
+  const preserved = structuredClone(editor.getCurrentPageShapes().filter(shape => !shape.id.startsWith('shape:change-template-') && !shape.id.startsWith('shape:change-station-')))
+  initializeDevelop(editor, { challenge: 'An existing workshop.' })
+  for (const shape of [...modified, clone, oldStations[0], ...preserved]) {
+    const actual = editor.getShape(shape.id)
+    assert.ok(actual, `lost ${shape.id}`)
+    assert.deepEqual(actual.props, shape.props)
+    assert.equal(actual.x, shape.x)
+    assert.equal(actual.y, shape.y)
+    assert.equal(actual.isLocked, shape.isLocked)
+  }
+  for (const original of originalTemplates.slice(5)) assert.equal(editor.getShape(original.id), undefined)
+  assert.equal(getDeckShapes(editor).length, 4)
+  assert.equal(getDeckShapes(editor).find(shape => shape.props.category === oldStations[0].props.category).id, `shape:change-deck-${oldStations[0].props.category}`)
+  assert.deepEqual(editor.getCurrentPage().meta.developOrder, ['shape:my-idea'])
+  const after = structuredClone(editor.getCurrentPageShapes())
+  assert.equal(initializeDevelop(editor, { challenge: 'An existing workshop.' }), false)
+  assert.deepEqual(editor.getCurrentPageShapes(), after)
+})
+
+test('draws are front-facing random unseen cards, respect route depletion, and become available after return', () => {
+  const editor = editorWith(), author = { id: 'alice', name: 'Alice' }, category = CARDS[0].category
+  initializeDevelop(editor, { challenge: 'Draw something unexpected.' })
+  const deckCards = CARDS.filter(card => card.category === category)
+  const first = drawFromDeck(editor, category, { author, random: () => 0.65 })
+  assert.equal(first.shape.props.cardId, deckCards[Math.floor(deckCards.length * 0.65)].id)
+  assert.equal(first.shape.props.face, 'front')
+  assert.equal(first.shape.props.authorId, author.id)
+  assert.equal(first.shape.isLocked, undefined)
+  assert.equal(first.deck.props.category, category)
+  assert.equal(editor.focusedBounds, null, 'drawing itself must not teleport the camera')
+  assert.equal(getDeckState(editor, category).remaining.length, 9)
+  const record = schema.types.shape.create({ ...first.shape, parentId: editor.getCurrentPage().id, index: 'a1' })
+  assert.equal(schema.types.shape.validate(record), record)
+  const seen = new Set([first.shape.props.cardId])
+  while (getDeckState(editor, category).remaining.length) {
+    const result = drawFromDeck(editor, category, { author, random: () => 0.5 })
+    assert.equal(seen.has(result.shape.props.cardId), false)
+    seen.add(result.shape.props.cardId)
+  }
+  assert.equal(seen.size, 10)
+  const exhausted = structuredClone(editor.getCurrentPageShapes())
+  assert.equal(drawFromDeck(editor, category, { author }), null)
+  assert.deepEqual(editor.getCurrentPageShapes(), exhausted)
+  editor.deleteShape(first.shape.id)
+  assert.equal(getDeckState(editor, category).remaining.length, 1)
+  assert.equal(drawFromDeck(editor, category, { author }).shape.props.cardId, first.shape.props.cardId)
+  assert.equal(drawFromDeck(editor, 'unknown-category', { author }), null)
+  activateRoute(editor, CURATED_ROUTES[0].id, { author })
+  const routeIds = new Set(CURATED_ROUTES[0].cardIds)
+  assert.ok(getDeckState(editor).remaining.every(card => !routeIds.has(card.id)))
+  const beforeReadonly = structuredClone(editor.getCurrentPageShapes())
+  editor.setReadonly(true)
+  assert.equal(drawFromDeck(editor, undefined, { author }), null)
+  assert.deepEqual(editor.getCurrentPageShapes(), beforeReadonly)
+})
+
+test('deck migration preserves native arrow connections to otherwise pristine catalogue cards and headings', () => {
+  const challenge = 'Our connected ideas'
+  const targets = [
+    { ...templateShapes()[0], isLocked: true },
+    { ...stationShapes()[0], isLocked: true },
+    { id: 'shape:develop-heading', type: 'text', x: DEVELOP_X, y: -80,
+      props: { richText: toRichText('Room for a different idea.') }, meta: { safariScaffolding: true } },
+    { id: 'shape:develop-starting-idea', type: 'text', x: DEVELOP_X, y: 40,
+      props: { richText: toRichText(challenge) }, meta: { startingIdea: true } },
+  ]
+  const editor = editorWith(targets)
+  editor.updatePage({ meta: { developInitialized: true } })
+  targets.forEach((target, index) => {
+    const arrowId = `shape:my-connection-${index}`
+    editor.createShape({ id: arrowId, type: 'arrow', x: 6700, y: 300 + index * 80, props: { start: { x: 0, y: 0 }, end: { x: 150, y: 0 } } })
+    editor.createBinding({ id: `binding:my-connection-${index}`, type: 'arrow', fromId: arrowId, toId: target.id,
+      props: { terminal: 'end', normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false, isPrecise: true, snap: 'none' } })
+  })
+  const before = structuredClone(editor.getCurrentPageShapes()), bindings = structuredClone([...editor.bindings.values()])
+  initializeDevelop(editor, { challenge })
+  for (const shape of before) assert.deepEqual(editor.getShape(shape.id), shape, `changed connected record ${shape.id}`)
+  assert.deepEqual([...editor.bindings.values()], bindings)
+  assert.equal(getDeckShapes(editor).length, 4)
+  assert.equal(getDeckShapes(editor).find(shape => shape.props.category === targets[1].props.category).id, `shape:change-deck-${targets[1].props.category}`)
 })

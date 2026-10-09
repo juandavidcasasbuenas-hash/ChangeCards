@@ -132,6 +132,7 @@ function CardFace({ shape }) {
   return <HTMLContainer style={{ width: shape.props.w, height: shape.props.h }}>
     <article className={`dvc-card dvc-category-${card.category} ${face === 'back' && !template ? 'dvc-card-back' : 'dvc-card-front'}`}
       data-change-card={card.id} data-card-face={template ? 'front' : face} data-template={template || undefined}
+      data-dealing={context?.deal?.shapeId === shape.id || undefined}
       data-controls={controls || undefined} aria-label={`${card.title}${template ? ', Change Card' : `, ${authorName || 'your'} take`}`}
       style={{ '--dvc-color': color, width: CARD_W, height: shape.props.h * CARD_W / shape.props.w, transform: `scale(${shape.props.w / CARD_W})` }}>
       <header className="dvc-card-meta"><span>{card.label}</span><span>{template ? String(card.id).padStart(2, '0') : authorName || 'Your take'}</span></header>
@@ -187,6 +188,52 @@ function StationFace({ shape }) {
       <div><span className="dvc-station-prompt">{STATION_PROMPTS[category.id]}</span><h2>{category.label}<small>{CARDS.filter(item => item.category === category.id).length} cards</small></h2></div>
       <ChangeCardDoodle cardId={card?.id}/>
     </div>
+  </HTMLContainer>
+}
+
+function DeckFace({ shape }) {
+  const editor = useEditor()
+  const context = useDevelop()
+  const category = categoryById.get(shape.props.category) || CATEGORIES[0]
+  const card = CARDS.find(item => item.category === category.id)
+  const total = CARDS.filter(item => item.category === category.id).length
+  const remaining = context?.deckCounts?.[category.id] ?? total
+  const readonly = useValue('change deck readonly', () => editor.getInstanceState().isReadonly, [editor])
+  const controls = useValue('change deck controls', () => ['select', 'hand'].includes(editor.getCurrentToolId()), [editor])
+  const disabled = readonly || !controls || remaining === 0 || Boolean(context?.deal) || !context?.drawFromDeck
+  const [drawing, setDrawing] = useState(false)
+  const previousCount = useRef(remaining)
+
+  useEffect(() => {
+    const justDrew = remaining < previousCount.current
+    previousCount.current = remaining
+    if (!justDrew) { setDrawing(false); return }
+    setDrawing(true)
+    const timer = window.setTimeout(() => setDrawing(false), 750)
+    return () => window.clearTimeout(timer)
+  }, [remaining])
+
+  return <HTMLContainer style={{ width: shape.props.w, height: shape.props.h }}>
+    <article className={`dvc-deck dvc-category-${category.id}`} data-change-deck={category.id} data-deck-category={category.id}
+      data-controls={controls || undefined} data-empty={remaining === 0 || undefined} data-drawing={drawing || undefined}
+      aria-label={`${category.shortLabel} deck, ${remaining} of ${total} cards remaining`}
+      style={{ '--dvc-color': category.color, width: CARD_W, height: shape.props.h * CARD_W / shape.props.w, transform: `scale(${shape.props.w / CARD_W})` }}>
+      <span className="dvc-deck-sheet dvc-deck-sheet-far" aria-hidden="true"/>
+      <span className="dvc-deck-sheet dvc-deck-sheet-near" aria-hidden="true"/>
+      <div className="dvc-deck-top">
+        <header className="dvc-deck-meta"><span>Change Cards</span><span>{String(CATEGORIES.indexOf(category) + 1).padStart(2, '0')} / 04</span></header>
+        <div className="dvc-deck-art"><ChangeCardDoodle cardId={card?.id}/></div>
+        <div className="dvc-deck-heading"><span>Being</span><h2>{category.shortLabel}</h2></div>
+        <p>{STATION_PROMPTS[category.id]}</p>
+        <footer className="dvc-deck-footer">
+          <span className="dvc-deck-count" aria-live="polite" aria-atomic="true"><b>{String(remaining).padStart(2, '0')}</b><span>{remaining === 0 ? 'all on the table' : 'in the pile'}</span></span>
+          <button type="button" {...isolate} onClick={event => context?.drawFromDeck?.(category.id, { originElement: event.currentTarget })} disabled={disabled} tabIndex={controls ? 0 : -1}
+            aria-label={`Draw a random ${category.shortLabel.toLowerCase()} card`}>
+            {remaining === 0 ? 'All drawn' : 'Draw a card'}<svg viewBox="0 0 27 25" fill="none" aria-hidden="true"><path d="M3 18.5h8.5M8 14.5l4 4-4 4M11 3h12v16H15M15 7h4M15 10h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </footer>
+      </div>
+    </article>
   </HTMLContainer>
 }
 
@@ -269,9 +316,27 @@ class ChangeStationShapeUtil extends BaseBoxShapeUtil {
   canEdit() { return false }
   canResize() { return false }
   canBind() { return false }
-  component(shape) { return <StationFace shape={shape}/> }
+  component(shape) { return shape.meta.developDeck ? <DeckFace shape={shape}/> : <StationFace shape={shape}/> }
   getIndicatorPath() { return new Path2D() }
-  toSvg(shape) { const category = categoryById.get(shape.props.category); return <text x="20" y="82" fontSize="44" fontWeight="700" fill="#25212a">{category?.label || 'Change Cards'}</text> }
+  async toSvg(shape) {
+    const category = categoryById.get(shape.props.category) || CATEGORIES[0]
+    if (!shape.meta.developDeck) return <text x="20" y="82" fontSize="44" fontWeight="700" fill="#25212a">{category.label}</text>
+    const card = CARDS.find(item => item.category === category.id)
+    const artworkSrc = await embedArtwork(cardArtwork(card?.id)?.src)
+    const h = shape.props.h * CARD_W / shape.props.w
+    return <g transform={`scale(${shape.props.w / CARD_W})`}>
+      <rect x="0" y="0" width={CARD_W} height={h} rx="7" fill={category.color} stroke="#29272a" strokeOpacity=".5" transform="translate(5 7) rotate(-3 150 215)"/>
+      <rect x="0" y="0" width={CARD_W} height={h} rx="7" fill={category.color} stroke="#29272a" strokeOpacity=".5" transform="translate(1 4) rotate(2 150 215)"/>
+      <rect x="0" y="0" width={CARD_W} height={h} rx="7" fill={category.color} stroke="#29272a" strokeOpacity=".6"/>
+      <text x="22" y="31" fontFamily="sans-serif" fontSize="10" fill="#25212a">CHANGE CARDS</text>
+      {artworkSrc && <image href={artworkSrc} x="72" y="60" width="156" height="156"/>}
+      <text x="22" y={h - 168} fontFamily="sans-serif" fontSize="13" fill="#25212a">BEING</text>
+      <text x="22" y={h - 131} fontFamily="sans-serif" fontSize={category.id === 'multidisciplinary' ? 25 : 32} fontWeight="750" fill="#25212a">{category.shortLabel.toUpperCase()}</text>
+      <text x="22" y={h - 101} fontFamily="sans-serif" fontSize="13" fill="#25212a">{STATION_PROMPTS[category.id]}</text>
+      <path d={`M22 ${h - 68}H278`} stroke="#25212a" strokeOpacity=".3"/>
+      <text x="22" y={h - 31} fontFamily="sans-serif" fontSize="12" fill="#25212a">A DECK OF 10 PROMPTS</text>
+    </g>
+  }
 }
 
 export const CHANGE_SHAPES = [ChangeCardShapeUtil, ChangeStationShapeUtil]

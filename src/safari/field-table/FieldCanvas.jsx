@@ -20,6 +20,7 @@ import { initializeDevelop, buildFromEvidence, showDevelop } from '../../develop
 import { rememberBoard } from '../../develop/storage.js'
 import { useDiscoveryResearch } from '../../develop/useDiscoveryResearch.js'
 import DevelopChrome from '../../develop/DevelopChrome.jsx'
+import DeckFlight from '../../develop/DeckFlight.jsx'
 import 'tldraw/tldraw.css'
 import './field-table.css'
 import './workshop-canvas.css'
@@ -271,7 +272,7 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
       })
     })
   }, [editor, stage, safari, collaboration, activeLens, outerRun?.onPhaseChange])
-  const develop = useDevelopController({ editor, safari, collaboration, setStage })
+  const develop = useDevelopController({ editor, safari, collaboration, setStage, stage })
   const buildOnFinding = useCallback(shape => {
     if (!editor || editor.getInstanceState().isReadonly) return
     initializeDevelop(editor, { challenge: safari.challenge })
@@ -331,7 +332,7 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
     editor.run(() => { editor.updateBindings(migration.bindings); editor.deleteShapes(migration.removeIds); editor.updateShapes(migration.compact) }, { history: 'ignore' })
     if (openingStage === 'develop') {
       const fresh = initializeDevelop(editor, { challenge: safari.challenge, legacy: safari.legacy })
-      if (fresh || focusRequestedStage) requestAnimationFrame(() => { if (!editor.isDisposed) showDevelop(editor, 'table', { animate: false }) })
+      if (fresh || focusRequestedStage) requestAnimationFrame(() => { if (!editor.isDisposed) showDevelop(editor, fresh ? 'decks' : 'table', { animate: false }) })
     }
     if (openingStage === 'discover') {
       const fresh = seedCanvas(editor, safari, legacy.current)
@@ -351,6 +352,7 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
     return () => { stopCreates(); stopChanges(); stopDeletes() }
   }, [])
   return <SafariCanvasContext.Provider value={context}><DevelopContext.Provider value={{ ...develop, safari }}><div className="esc-workbench" data-workshop-stage={stage} data-research-busy={Boolean(run?.busy)}>
+    <DeckFlight deal={develop.deal}/>
     <CanvasHeader editor={editor}/>{stage === 'develop' ? <DevelopChrome/> : <StationNav editor={editor}/>}
     <div className="esc-stage">
       {collaboration && collaboration.status !== 'online' && <div className="esc-sync-status" role="status">{collaboration.problem || (collaboration.status === 'loading' ? 'Connecting to the shared table…' : collaboration.status === 'error' ? 'The connection needs a refresh. Copy your notes before reopening.' : 'Reconnecting… Keep this tab open until your changes have synced.')}</div>}

@@ -1,0 +1,10 @@
+.dv-card-flight { position:fixed; z-index:55; width:300px; height:430px; pointer-events:none; transform-origin:top left; animation:dv-deal-flight 920ms cubic-bezier(.23,.7,.25,1) both; filter:drop-shadow(0 13px 11px #2b1c3e25); }
+.dv-card-flight .dvc-card { width:300px; height:430px; pointer-events:none; }
+.dv-card-flight .dvc-card-front-footer > span:last-child { font:11px 'DM Sans',sans-serif; }
+@keyframes dv-deal-flight {
+  0% { transform:translate(var(--flight-x),var(--flight-y)) rotate(-6deg) scale(var(--flight-scale-from)); }
+  35% { transform:translate(calc(var(--flight-x) * .55),var(--flight-lift)) rotate(7deg) scale(var(--flight-scale-to)); }
+  82% { transform:translate(6px,-9px) rotate(-2deg) scale(var(--flight-scale-to)); }
+  100% { transform:translate(0,0) rotate(0) scale(var(--flight-scale-to)); }
+}
+@media(prefers-reduced-motion:reduce) { .dv-card-flight { animation:none; transform:scale(var(--flight-scale-to)); } }

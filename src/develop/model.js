@@ -4,6 +4,7 @@ export const DEVELOP_X = 6400
 export const CATALOGUE_X = 8800
 export const CARD_W = 300
 export const CARD_H = 430
+export const DECK_Y = -550
 export const WORKSPACE_W = 2000
 export const WORKSPACE_H = 2400
 export const STATION_W = 1640
@@ -34,6 +35,20 @@ export function workingPosition(index = 0) {
 
 export const templateShapeId = cardId => `shape:change-template-${cardId}`
 export const stationShapeId = category => `shape:change-station-${typeof category === 'object' ? category.id : category}`
+
+export function deckPosition(category) {
+  const id = typeof category === 'object' ? category?.id : category
+  const index = Math.max(0, CATEGORIES.findIndex(item => item.id === id))
+  return { x: DEVELOP_X + index * (CARD_W + 90), y: DECK_Y }
+}
+
+export function deckShapes() {
+  return CATEGORIES.map(category => ({
+    id: stationShapeId(category), type: 'change-station', ...deckPosition(category), isLocked: true,
+    props: { w: CARD_W, h: CARD_H, category: category.id },
+    meta: { workshopStage: 'develop', developDeck: true },
+  }))
+}
 
 export function changeCardProps(cardId, overrides = {}) {
   return { w: CARD_W, h: CARD_H, cardId, face: 'front', note: '', draft: '', authorId: '', authorName: '', template: false, sparks: [], ...overrides }

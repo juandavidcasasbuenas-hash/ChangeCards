@@ -23,21 +23,24 @@ function RouteIcon() {
 }
 
 export default function DevelopChrome() {
-  const work = useDevelop(), { editor, entries, route, routeCards, activeCardId, category } = work
+  const work = useDevelop(), { editor, entries, route, routeCards, activeCardId, category, deckCounts, deal } = work
   const [panel, setPanel] = useState(null)
   const readonly = useValue('develop controls readonly', () => !editor || editor.getInstanceState().isReadonly, [editor])
   const saved = entries.filter(shape => shape.props.note)
-  const draw = () => { const undrawn = CARDS.filter(card => !entries.some(shape => shape.props.cardId === card.id)); const pool = undrawn.length ? undrawn : CARDS; work.drawCard(pool[Math.floor(Math.random() * pool.length)].id) }
+  const selectedDeck = CATEGORIES.some(item => item.id === category) ? category : null
+  const remaining = selectedDeck ? deckCounts[selectedDeck] : Object.values(deckCounts).reduce((sum, count) => sum + count, 0)
+  const draw = event => work.drawFromDeck(selectedDeck, { originElement: event.currentTarget })
   return <div className="dv-navigation">
     <div className="esc-explore-bar dv-explore-bar">
       <nav className="esc-stations dv-categories" aria-label="Explore Change Cards">
-        <button className="dv-table-tab" disabled={!editor} aria-pressed={category === 'table'} onClick={() => work.visit('table')}>Your table <b>{entries.length}</b></button>
-        {CATEGORIES.map((item, i) => <button key={item.id} className="esc-station-tab" aria-pressed={category === item.id} disabled={!editor} onClick={() => work.visit(item.id)} style={{ '--evidence-color': item.color }}><CategoryMark cardId={[1, 5, 9, 13][i]}/><span>{item.shortLabel}</span><b>10</b></button>)}
+        <button className="dv-table-tab" disabled={!editor} aria-pressed={category === 'decks'} onClick={() => work.visit('decks')}>The decks</button>
+        {CATEGORIES.map((item, i) => <button key={item.id} className="esc-station-tab" aria-pressed={category === item.id} disabled={!editor} onClick={() => work.visit(item.id)} style={{ '--evidence-color': item.color }}><CategoryMark cardId={[1, 5, 9, 13][i]}/><span>{item.shortLabel}</span><b>{deckCounts[item.id]}</b></button>)}
+        {entries.length > 0 && <button className="dv-table-tab" aria-pressed={category === 'table'} onClick={() => work.visit('table')}>Your cards <b>{entries.length}</b></button>}
       </nav>
       <div className="esc-explore-actions dv-explore-actions">
         <button onClick={() => setPanel('routes')} disabled={readonly} aria-label="Choose a curated route"><RouteIcon/><span>Routes</span></button>
         <button onClick={() => setPanel('saved')} disabled={!editor} aria-label={`Scrapbook ${saved.length}`}><Icon name="book" size={17}/><span>Scrapbook</span><b>{saved.length}</b></button>
-        <button className="esc-wander" onClick={draw} disabled={readonly}><Icon name="shuffle" size={17}/><span>Draw a card</span></button>
+        <button className="esc-wander" onClick={draw} disabled={readonly || Boolean(deal) || !remaining}><Icon name="shuffle" size={17}/><span>Draw a card</span></button>
       </div>
     </div>
     {route && <div className="dv-route-ribbon">
