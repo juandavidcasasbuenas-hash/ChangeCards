@@ -1,0 +1,35 @@
+.esc-invite { flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 13px; background: #eee7f5; border: 1px solid #c7b6d8; border-radius: 6px; color: #4f3a65; font: 600 12px 'DM Sans', sans-serif; }
+.esc-invite:hover { background: #e3d7ee; }
+.esc-invite:disabled { opacity: .45; }
+.esc-people-count { display: grid; place-items: center; width: 19px; height: 19px; background: #665080; border-radius: 50%; color: white; font: 10px 'DM Mono', monospace; }
+.esc-invite-dialog { width: 420px; max-width: calc(100vw - 28px); max-height: calc(100dvh - 32px); padding: 28px; border: 1px solid #52435f; border-radius: 12px; background: #fffdf9; color: #29262d; box-shadow: 7px 8px 0 #29262d22; font: 14px/1.5 'DM Sans', sans-serif; }
+.esc-invite-dialog::backdrop { background: #29262d45; }
+.esc-invite-dialog > header { display: flex; align-items: center; justify-content: space-between; }
+.esc-invite-dialog header button { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #eee7f5; color: #665080; }
+.esc-share-spark { display: block; font-size: 46px; color: #bd664d; line-height: 1; }
+.esc-invite-dialog h2 { margin: 18px 0 12px; font: 800 34px/1.02 'DM Sans', sans-serif; letter-spacing: -1.3px; }
+.esc-invite-dialog p { margin: 0 0 24px; color: #6f6477; }
+.esc-invite-dialog label, .esc-join label { display: grid; gap: 7px; font-size: 12px; color: #5f526a; }
+.esc-invite-dialog input, .esc-join input { min-width: 0; width: 100%; padding: 12px; background: #fff; border: 1px solid #c6bccc; border-radius: 5px; color: #29262d; font: 14px 'DM Sans', sans-serif; }
+.esc-invite-link input { font: 11px 'DM Mono', monospace; }
+.esc-share-primary { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 44px; margin-top: 14px; padding: 12px; background: #665080; color: #fff; border: 1px solid #4e3b63; border-radius: 6px; box-shadow: 0 3px 0 #34274422; cursor: pointer; font: 600 13px 'DM Sans', sans-serif; }
+.esc-share-primary:hover { background: #534069; }
+.esc-share-primary:disabled { opacity: .55; cursor: default; }
+.esc-share-footnote { display: block; margin-top: 14px; font-size: 11px; line-height: 1.6; color: #8b7f92; }
+.esc-invite-dialog .esc-share-error { margin: 16px 0 0; color: #a04435; font-size: 13px; }
+.esc-present { margin-top: 25px; padding-top: 18px; border-top: 1px solid #ded6e5; }
+.esc-present > small { text-transform: uppercase; font: 9px 'DM Mono', monospace; color: #86758f; }
+.esc-present ul { margin: 10px 0 20px; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 15px; }
+.esc-present li { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.esc-present li i { width: 10px; height: 10px; border-radius: 50%; }
+.esc-present li span { font-size: 10px; color: #897b92; }
+.esc-sync-status { position: absolute; z-index: 251; top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 9px 16px; border: 1px solid #dbbf77; border-radius: 6px; background: #fff0c5; color: #6b5321; font: 12px/1.5 'DM Sans', sans-serif; pointer-events: all; text-align: center; }
+.esc-sync-status button { margin-left: 10px; background: none; border: 0; text-decoration: underline; font: inherit; }
+.esc-join { width: min(420px, calc(100% - 40px)); margin: clamp(30px, 10vh, 120px) auto; color: #29262d; font-family: 'DM Sans', sans-serif; }
+.esc-join-brand { display: block; color: #29262d; font-size: 13px; font-weight: 800; text-decoration: none; letter-spacing: -.2px; margin-bottom: 64px; }
+.esc-join h1 { font: 800 46px/.98 'DM Sans', sans-serif; letter-spacing: -2px; margin: 20px 0; }
+.esc-join p { font-size: 15px; line-height: 1.6; color: #776782; margin-bottom: 25px; }
+.esc-join .esc-join-question { border-left: 4px solid #c8b5df; padding-left: 16px; }
+.esc-join > small, .esc-join > a:last-child { display: block; margin-top: 20px; color: #897b92; font-size: 12px; line-height: 1.6; }
+@media (max-width: 700px) { .esc-header { column-gap: 10px; } .esc-invite { padding-inline: 10px; } .esc-invite-dialog { padding: 23px; } }
+@media (max-width: 390px) { .esc-invite { padding-inline: 8px; gap: 5px; } .esc-invite > svg { display: none; } }

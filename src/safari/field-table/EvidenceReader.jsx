@@ -3,7 +3,7 @@ import { useEditor, useValue } from 'tldraw'
 import { cardMarkdown, copyText, evidenceLabel } from '../field-guide.js'
 import { Doodle, Icon } from '../primitives.jsx'
 import { LENS_COLORS, safeSourceUrl } from './model.js'
-import { closeReading, readingSession, turnCard } from './card-reading.js'
+import { closeReading, markFindingSeen, readingSession, turnCard } from './card-reading.js'
 import { evidenceShapes, ignorePointer, keepFinding, wander } from './canvas-actions.js'
 
 export default function EvidenceReader() {
@@ -30,9 +30,7 @@ function Reader({ editor, shape }) {
     const element = dialog.current
     element.showModal()
     closeButton.current?.focus({ preventScroll: true })
-    const page = editor.getCurrentPage()
-    editor.run(() => editor.updatePage({ id: page.id, meta: { ...page.meta,
-      safariSeenIds: [...new Set([...(page.meta.safariSeenIds || []), card.id])] } }), { history: 'ignore' })
+    markFindingSeen(editor, card.id)
     return () => element.close()
   }, [editor, card.id])
   const copy = async () => {

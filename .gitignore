@@ -13,4 +13,6 @@ openAI.txt
 jev.txt
 npm-debug.log*
 verification-*.png
+.wrangler/
+.dev.vars*
 supabase/.temp/

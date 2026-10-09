@@ -1,0 +1,17 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "change-cards-safari-sync",
+  "main": "worker.mjs",
+  "account_id": "47805ffb37fd2d4301d6c89900a64d88",
+  "compatibility_date": "2026-10-09",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://change-cards.vercel.app,http://localhost:8790,http://localhost:8791,http://localhost:5173,http://127.0.0.1:8790"
+  },
+  "durable_objects": { "bindings": [
+    { "name": "SAFARI_ROOMS", "class_name": "SafariRoom" },
+    { "name": "SAFARI_QUOTA", "class_name": "SafariQuota" }
+  ] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SafariRoom", "SafariQuota"] }],
+  "observability": { "enabled": false }
+}

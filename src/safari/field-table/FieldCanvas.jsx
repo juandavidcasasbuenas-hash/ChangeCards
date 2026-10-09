@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BaseBoxShapeUtil, HTMLContainer, T, Tldraw, createShapeId, toRichText, useEditor, useValue } from 'tldraw'
+import { BaseBoxShapeUtil, HTMLContainer, Tldraw, createShapeId, toRichText, useEditor, useValue } from 'tldraw'
+import { evidenceProps, sourceProps, stationProps } from '../../../shared/safari-shapes.mjs'
+import { linkFor, rememberedSession } from '../collaboration/session-client.js'
 import { evidenceLabel } from '../field-guide.js'
 import { Doodle, Icon } from '../primitives.jsx'
 import { LENSES, LENS_COPY } from '../discovery.js'
@@ -7,7 +9,7 @@ import { trailStatus } from '../live.js'
 import { LENS_COLORS, readTable, safeSourceUrl } from './model.js'
 import { CANVAS_KEY, CARD_W, CARD_H, STATION_W, STATION_HEADER_H, cardPosition, evidencePayload, incomingEvidence, isOriginalPilePosition, sourceCardMigration, stationPosition, wrapSvgText } from './canvas-model.js'
 import { SafariCanvasContext, useSafariCanvas } from './canvas-context.js'
-import { closeReading, readingSession, turnCard } from './card-reading.js'
+import { closeReading, readingSession, setPrivateReading, turnCard } from './card-reading.js'
 import { ignorePointer, sid, visitStation } from './canvas-actions.js'
 import { CanvasHeader, StationNav, CanvasProgress, CanvasToolbar, CanvasNavigation, CanvasStylePanel } from './CanvasChrome.jsx'
 import EvidenceReader from './EvidenceReader.jsx'
@@ -54,7 +56,7 @@ function SvgCard({ shape }) {
 
 class EvidenceShapeUtil extends BaseBoxShapeUtil {
   static type = 'safari-evidence-card'
-  static props = { w: T.number, h: T.number, evidence: T.jsonValue }
+  static props = evidenceProps
   getDefaultProps() { return { w: CARD_W, h: CARD_H, evidence: { card: {}, source: null } } }
   canEdit() { return false }
   canResize() { return false }
@@ -68,7 +70,7 @@ class EvidenceShapeUtil extends BaseBoxShapeUtil {
 
 class SourceShapeUtil extends EvidenceShapeUtil {
   static type = 'safari-source-card'
-  static props = { w: T.number, h: T.number, evidence: T.jsonValue, findingShapeId: T.string }
+  static props = sourceProps
   getDefaultProps() { return { w: CARD_W, h: CARD_H, evidence: { card: {}, source: null }, findingShapeId: '' } }
 }
 
@@ -81,7 +83,7 @@ function TrailFace({ shape }) {
 
 class TrailShapeUtil extends BaseBoxShapeUtil {
   static type = 'safari-trail'
-  static props = { w: T.number, h: T.number, lens: T.string }
+  static props = stationProps
   getDefaultProps() { return { w: CARD_W, h: CARD_H, lens: 'People' } }
   canEdit() { return false }
   canBind() { return false }
@@ -107,7 +109,7 @@ class StationShapeUtil extends TrailShapeUtil {
   toSvg(shape) { return <text x={20} y={72} fontSize={44} fontWeight={700} fill="#262329">{shape.props.lens}</text> }
 }
 
-const SHAPES = [EvidenceShapeUtil, SourceShapeUtil, TrailShapeUtil, StationShapeUtil]
+export const SAFARI_SHAPES = [EvidenceShapeUtil, SourceShapeUtil, TrailShapeUtil, StationShapeUtil]
 const COMPONENTS = { MenuPanel: null, TopPanel: null, QuickActions: null, ActionsMenu: null, PageMenu: null,
   Toolbar: CanvasToolbar, NavigationPanel: CanvasNavigation, StylePanel: CanvasStylePanel }
 
@@ -209,6 +211,13 @@ function appendEvidence(editor, safari) {
 }
 
 export default function FieldCanvas({ safari, run = null }) {
+  const [session] = useState(() => rememberedSession(safari.id))
+  useEffect(() => { if (session && !run?.busy) location.replace(linkFor(session)) }, [session, run?.busy])
+  if (session && !run?.busy) return <div className="esc-loading" role="status">Opening your shared table…</div>
+  return <CanvasSurface safari={safari} run={run}/>
+}
+
+export function CanvasSurface({ safari, run = null, store = null, collaboration = null }) {
   const legacy = useRef(null), latest = useRef(safari), untouched = useRef(true)
   const [editor, setEditor] = useState(null)
   const [activeLens, updateActiveLens] = useState('all'), [shelf, setShelf] = useState(false)
@@ -216,20 +225,41 @@ export default function FieldCanvas({ safari, run = null }) {
   if (!legacy.current) legacy.current = readTable(safari)
   const setActiveLens = useCallback(lens => {
     untouched.current = false; updateActiveLens(lens)
-    if (editor) editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
-  }, [editor])
-  const context = useMemo(() => ({ safari, run, activeLens, setActiveLens, shelf, setShelf }), [safari, run, activeLens, setActiveLens, shelf])
+    if (editor && !collaboration) editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
+  }, [editor, collaboration])
+  const context = useMemo(() => ({ safari, run, activeLens, setActiveLens, shelf, setShelf, collaboration }), [safari, run, activeLens, setActiveLens, shelf, collaboration])
   useEffect(() => {
-    if (!editor || editor.isDisposed) return
+    if (!editor || editor.isDisposed || !collaboration) return
+    const offline = collaboration.status !== 'online'
+    editor.updateInstanceState({ isReadonly: offline })
+    const warn = event => { event.preventDefault(); event.returnValue = '' }
+    if (offline) window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [editor, collaboration?.status])
+  useEffect(() => {
+    if (!editor || editor.isDisposed || collaboration) return
     const { additions, first } = appendEvidence(editor, safari)
     if (first && additions.length && untouched.current) {
       const lens = additions[0].lens; updateActiveLens(lens); visitStation(editor, lens)
       editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
     }
-  }, [editor, safari])
+  }, [editor, safari, collaboration])
   const mounted = useCallback(editor => {
     const safari = latest.current
     setEditor(editor)
+    if (collaboration) {
+      setPrivateReading(editor, collaboration.session.roomId)
+      editor.user.updateUserPreferences({ colorScheme: 'light', isSnapMode: true })
+      requestAnimationFrame(() => {
+        if (editor.isDisposed) return
+        if (collaboration.camera) { editor.setCamera(collaboration.camera); updateActiveLens(collaboration.activeLens || 'all') }
+        else {
+          const lens = LENSES.find(name => editor.getCurrentPageShapes().some(shape => shape.props.evidence?.card?.lens === name)) || 'all'
+          updateActiveLens(lens); visitStation(editor, lens, { animate: false })
+        }
+      })
+      return editor.sideEffects.registerAfterDeleteHandler('shape', shape => { if (readingSession(editor).get()?.shapeId === shape.id) closeReading(editor) })
+    }
     updateActiveLens(editor.getCurrentPage().meta.safariActiveLens || 'all')
     editor.user.updateUserPreferences({ colorScheme: 'light', isSnapMode: true })
     const shapes = editor.getCurrentPageShapes()
@@ -253,7 +283,9 @@ export default function FieldCanvas({ safari, run = null }) {
   }, [])
   return <SafariCanvasContext.Provider value={context}><div className="esc-workbench" data-research-busy={Boolean(run?.busy)}>
     <CanvasHeader editor={editor}/><StationNav editor={editor}/>
-    <div className="esc-stage"><Tldraw shapeUtils={SHAPES} components={COMPONENTS} options={OPTIONS} persistenceKey={CANVAS_KEY + safari.id} onMount={mounted} licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY} inferDarkMode={false}>
+    <div className="esc-stage">
+      {collaboration && collaboration.status !== 'online' && <div className="esc-sync-status" role="status">{collaboration.problem || (collaboration.status === 'loading' ? 'Connecting to the shared table…' : collaboration.status === 'error' ? 'The connection needs a refresh. Copy your notes before reopening.' : 'Reconnecting… Keep this tab open until your changes have synced.')}</div>}
+      <Tldraw shapeUtils={SAFARI_SHAPES} components={COMPONENTS} options={OPTIONS} {...(store ? { store } : { persistenceKey: CANVAS_KEY + safari.id })} onMount={mounted} licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY} inferDarkMode={false}>
       <CanvasProgress/><EvidenceReader/>
     </Tldraw></div>
   </div></SafariCanvasContext.Provider>

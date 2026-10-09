@@ -1,7 +1,7 @@
 import { Box, createShapeId, toRichText } from 'tldraw'
 import { chooseFinding } from '../discovery.js'
 import { cardPosition, CARD_H, CARD_W } from './canvas-model.js'
-import { turnCard } from './card-reading.js'
+import { seenFindings, turnCard } from './card-reading.js'
 
 export const sid = id => createShapeId(`evidence-${id}`)
 export const ignorePointer = event => event.stopPropagation()
@@ -29,11 +29,12 @@ export function visitStation(editor, lens, options) {
 export function wander(editor, options = {}) {
   const shapes = evidenceShapes(editor)
   const cards = [...new Map(shapes.map(shape => [shape.props.evidence.card.id, shape.props.evidence.card])).values()]
-  const card = chooseFinding(cards, editor.getCurrentPage().meta.safariSeenIds || [], options)
+  const card = chooseFinding(cards, seenFindings(editor), options)
   if (card) turnCard(editor, shapes.find(shape => shape.props.evidence.card.id === card.id))
 }
 
 export function keepFinding(editor, cardId) {
+  if (editor.getInstanceState().isReadonly) return
   const shapes = evidenceShapes(editor).filter(shape => shape.props.evidence.card.id === cardId)
   const kept = !shapes.some(shape => shape.meta.safariKept)
   editor.markHistoryStoppingPoint('keep-finding')
@@ -41,6 +42,7 @@ export function keepFinding(editor, cardId) {
 }
 
 export function addNote(editor, text = '') {
+  if (editor.getInstanceState().isReadonly) return
   const { x, y } = editor.getViewportPageBounds().center
   const id = createShapeId()
   editor.markHistoryStoppingPoint('add-field-note')
@@ -53,6 +55,7 @@ export function addNote(editor, text = '') {
 
 // An explicit, undoable tidy. Personal notes, groups and drawings are never moved.
 export function tidyStation(editor, lens) {
+  if (editor.getInstanceState().isReadonly) return
   const byLens = new Map()
   for (const shape of evidenceShapes(editor)) {
     const cardLens = shape.props.evidence.card.lens

@@ -6,11 +6,13 @@ import 'dotenv/config'
 import { health, sparks, transform } from './lib/openai-api.mjs'
 import { evidenceSafari } from './lib/evidence-safari/http.mjs'
 import { safariWeb } from './lib/evidence-safari/web.mjs'
+import { safariSession } from './lib/safari-session.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const port = Number(process.env.PORT || 8787)
 
+app.all('/api/safari/session', express.json({ limit: '2mb' }), safariSession)
 app.use(express.json({ limit: '32kb' }))
 app.get('/api/health', health)
 app.post('/api/transform', transform)
