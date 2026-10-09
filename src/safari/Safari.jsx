@@ -146,7 +146,7 @@ export default function Safari() {
           <button className="sf-example sf-text-button" onClick={example} disabled={busy}>Try an example <span className="example-spark" aria-hidden="true">✦</span></button>
           <p className="sf-example-note">Science communicators & a free design thinking workshop</p>
           <a className="sf-field-table-link" href="/safari/field-table"><Icon name="shuffle" size={19}/><span><strong>Open the canvas field table</strong><small>Pull out evidence, draw connections and think on the page.</small></span><Icon name="arrow" size={17}/></a>
-          {library.safaris.length > 0 && <details className="sf-recent"><summary>Pick up a previous trail <span>{library.safaris.length}</span><Icon name="down" size={15}/></summary><div>{library.safaris.map(s => <button key={s.id} onClick={() => openRecent(s.id)}><span>{s.challenge}</span><small>{s.savedIds?.length || 0} kept · {date(s.generatedAt)}</small><Icon name="arrow" size={16}/></button>)}</div></details>}
+          {library.safaris.length > 0 && <details className="sf-recent"><summary>Pick up a previous trail <span>{library.safaris.length}</span><Icon name="down" size={15}/></summary><div>{library.safaris.map(s => <button key={s.id} onClick={() => openRecent(s.id)}><span>{s.challenge}</span><small>{s.preferredView === 'canvas' ? `${s.cards.length} finds` : `${s.savedIds?.length || 0} kept`} · {date(s.generatedAt)}</small><Icon name="arrow" size={16}/></button>)}</div></details>}
         </div>
       </section>}
 

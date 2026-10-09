@@ -1,12 +1,32 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { CARD_W, CARD_H, canvasFieldNotes, evidencePayload, evidencePiles, incomingEvidence, sourceCardMigration, richTextPlainText } from '../src/safari/field-table/canvas-model.js'
+import { CARD_W, CARD_H, cardPosition, stationPosition, isOriginalPilePosition, canvasFieldNotes, evidencePayload, evidencePiles, incomingEvidence, sourceCardMigration, richTextPlainText } from '../src/safari/field-table/canvas-model.js'
 import { mergeSafari, mergeProgress, trailStatus } from '../src/safari/live.js'
 
 const sample = JSON.parse(fs.readFileSync(new URL('../public/safari/example/workshop.json', import.meta.url)))
 const rich = text => ({ type: 'doc', content: text.split('\n').map(text => ({ type: 'paragraph', content: [{ type: 'text', text }] })) })
 const cardShape = (id, card = sample.cards[0]) => ({ id, type: 'safari-evidence-card', props: { evidence: evidencePayload(sample, card) } })
+
+test('station layouts keep every card separate, including later arrivals and long questions', () => {
+  const positions = ['People', 'Patterns', 'Systems', 'Elsewhere', 'Edges', 'Possibilities'].flatMap(lens => Array.from({ length: 9 }, (_, i) => cardPosition(lens, i)))
+  for (let i = 0; i < positions.length; i++) for (let j = i + 1; j < positions.length; j++) {
+    const a = positions[i], b = positions[j]
+    assert.ok(a.x + CARD_W <= b.x || b.x + CARD_W <= a.x || a.y + CARD_H <= b.y || b.y + CARD_H <= a.y, `Cards ${i} and ${j} overlap`)
+  }
+  assert.ok(cardPosition('People', 0).y > stationPosition('People').y)
+  const short = evidencePiles({ ...sample, challenge: 'Short question' })
+  const long = evidencePiles({ ...sample, challenge: 'A long workshop question. '.repeat(40) })
+  assert.deepEqual(short, long, 'Questions live in the header and cannot overlap the evidence')
+})
+
+test('migration recognises generated piles but preserves moved and grouped evidence', () => {
+  assert.equal(isOriginalPilePosition({ parentId: 'page:one', x: 26, y: 264 }, 'People'), true)
+  assert.equal(isOriginalPilePosition({ parentId: 'page:one', x: 435, y: 680 }, 'Edges'), true)
+  assert.equal(isOriginalPilePosition({ parentId: 'page:one', x: -200, y: 280 }, 'People'), false)
+  assert.equal(isOriginalPilePosition({ parentId: 'shape:group', x: 0, y: 240 }, 'People'), false)
+  assert.equal(isOriginalPilePosition({ parentId: 'page:one', x: 0, y: 260 }, 'People'), false)
+})
 
 test('successive reveals add only new evidence and never restore a card the user already received then deleted', () => {
   const first = { ...sample, cards: sample.cards.slice(0, 4) }

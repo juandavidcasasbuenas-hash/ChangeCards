@@ -4,7 +4,7 @@ A tactile design-thinking card game. Play solo against a deck of 40 provocations
 
 ## Evidence Safari
 
-A separate discovery experience lives at `/safari`. Enter a challenge and checked findings arrive in six evidence piles on an editable canvas while research continues. Read, move and annotate cards as they appear; stop early to keep a partial collection. Recent safaris reopen their saved canvas. The precomputed example and older guides retain their discovery view. Copy and Markdown exports preserve references and personal notes; the discovery view also supports print/PDF. Change Cards retains its existing interface.
+A separate discovery experience lives at `/safari`. Enter a challenge and checked findings arrive in six evidence stations on an editable canvas while research continues. Read, move and annotate cards as they appear; stop early to keep a partial collection. Recent safaris reopen their saved canvas. The precomputed example and older guides retain their discovery view. Copy and Markdown exports preserve references and personal notes; the discovery view also supports print/PDF. Change Cards retains its existing interface.
 
 ```bash
 npm run safari -- "increasing participation of young people in conferences"
@@ -15,7 +15,7 @@ SAFARI_TEST_ORIGIN=http://localhost:8787 npm run verify:safari
 
 The CLI writes JSON and Markdown to `output/evidence-safari/`. Live generation needs server-side OpenAI and Perplexity API keys. Six static category doodles are reused; there are no image-generation calls. The website caps estimated work at $0.25 per run; the CLI defaults to $0.40. Research progress streams per perspective, and run time/cost are available under Behind the finds. A precomputed workshop example opens without API calls. [Implementation, API usage, costs and limitations](docs/evidence-safari.md).
 
-The field table at `/safari/field-table` is a full-screen tldraw canvas. Every finding starts as a movable evidence card in a loose pile. Draw and label arrows, select and group cards, make frames, add sticky notes, sketch, and undo using the native tools. The small **+** flips a card and zooms its reverse into view; closing it restores the previous table view. Details scroll inside that same card. The complete canvas saves in this browser; earlier field notes are carried over on first opening. Native SVG/PNG export and field-note Markdown retain evidence context. [Canvas implementation and verification](docs/safari-field-table.md).
+The field table at `/safari/field-table` is a full-screen tldraw canvas with coloured evidence stations. Jump between perspectives, open **Look closer** for the finding and source, keep useful finds or take a surprise detour. The reading panel leaves the card and camera untouched. Move cards, add notes, draw connections, and undo with the compact toolbar. Copy/download field notes with references; the native menu also exports SVG/PNG. Saved canvas work is retained when opening the new layout. [Canvas implementation and verification](docs/safari-field-table.md).
 
 ## Run locally
 

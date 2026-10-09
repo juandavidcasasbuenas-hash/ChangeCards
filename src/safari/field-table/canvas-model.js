@@ -3,7 +3,33 @@ import { cardMarkdown } from '../field-guide.js'
 
 export const CANVAS_KEY = 'evidence-safari.canvas.v2:'
 export const CARD_W = 348
-export const CARD_H = 330
+export const CARD_H = 348
+export const STATION_W = 1132
+export const STATION_H = 1310
+export const STATION_HEADER_H = 120
+
+// Fixed station space keeps later research from moving anything already on the table.
+export function stationPosition(lens) {
+  const index = Math.max(0, LENSES.indexOf(lens))
+  return { x: (index % 3) * (STATION_W + 170), y: Math.floor(index / 3) * (STATION_H + 130) }
+}
+
+export function cardPosition(lens, index) {
+  const { x, y } = stationPosition(lens)
+  return { x: x + (index % 3) * (CARD_W + 44), y: y + STATION_HEADER_H + 32 + Math.floor(index / 3) * (CARD_H + 40) }
+}
+
+// Only move an old card if it is still in an automatically generated pile. Hand
+// placements, grouped cards and their arrow bindings are left alone.
+export function isOriginalPilePosition(shape, lens) {
+  if (!String(shape.parentId || '').startsWith('page:')) return false
+  const index = LENSES.indexOf(lens)
+  if (index < 0) return false
+  const dx = shape.x - (index % 3) * 435
+  const dy = shape.y - (240 + Math.floor(index / 3) * 440)
+  const depth = Math.round(dx / 13)
+  return depth >= 0 && depth < 30 && Math.abs(dx - depth * 13) < 1 && Math.abs(dy - depth * 12) < 1
+}
 
 // Shapes carry their own evidence so copying or grouping never loses provenance.
 export function evidencePayload(safari, card) {
@@ -11,11 +37,11 @@ export function evidencePayload(safari, card) {
 }
 
 export function evidencePiles(safari, { includeEmpty = false } = {}) {
-  return LENSES.map((lens, index) => {
+  return LENSES.map(lens => {
     const cards = safari.cards.filter(card => card.lens === lens)
     const front = cards.find(card => card.id === (lens === 'People' ? 'people_1' : lens === 'Elsewhere' ? 'elsewhere_1' : '')) || cards[0]
     return {
-      lens, x: (index % 3) * 435, y: 240 + Math.floor(index / 3) * 440,
+      lens, ...stationPosition(lens),
       cards: [...cards.filter(card => card !== front).reverse(), ...(front ? [front] : [])],
     }
   }).filter(pile => includeEmpty || pile.cards.length)

@@ -15,8 +15,8 @@ export const LENS_NOTES = {
   Possibilities: 'Find a small opening for change.',
 }
 export const LENS_COLORS = {
-  People: '#ef9f86', Patterns: '#a9c6da', Systems: '#ead177',
-  Elsewhere: '#c2b3d4', Edges: '#b3c5a0', Possibilities: '#ebbc8e',
+  People: '#f2a18d', Patterns: '#a9c9e6', Systems: '#f1d16b',
+  Elsewhere: '#c8b5df', Edges: '#b5cea1', Possibilities: '#efbb86',
 }
 export const sourceFor = (safari, card) => safari.sources.find(source => source.id === card.sourceId)
 export const safeSourceUrl = value => {
