@@ -47,6 +47,8 @@ function editorWith(initial = []) {
     markHistoryStoppingPoint() {},
     getShapePageBounds: id => { const shape = shapes.get(id); return shape ? new Box(shape.x || 0, shape.y || 0, shape.props.w || 300, shape.props.h || 150) : null },
     getViewportScreenBounds: () => new Box(0, 0, 1400, 900),
+    getContainer: () => null,
+    updateViewportScreenBounds: () => editor,
     getContainerWindow: () => ({ matchMedia: () => ({ matches: true }) }),
     setCurrentTool: () => editor,
     selectNone: () => editor,

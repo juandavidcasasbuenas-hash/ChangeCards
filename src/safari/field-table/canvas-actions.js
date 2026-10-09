@@ -12,6 +12,9 @@ export const canvasMotion = (editor, duration = 460) => ({
 export const evidenceShapes = (editor, includeDevelop = false) => editor.getCurrentPageShapes().filter(shape => shape.props.evidence?.card?.id && (includeDevelop || !shape.meta.developmentSeed))
 
 export function focusShapes(editor, shapes, { animate = true, duration = 460 } = {}) {
+  // Menus and route ribbons can resize the editor before its resize listener
+  // runs. Measure the committed container so card actions stay above the tools.
+  editor.updateViewportScreenBounds(editor.getContainer())
   const boxes = shapes.map(shape => editor.getShapePageBounds(shape.id)).filter(Boolean)
   if (!boxes.length) return
   editor.setCurrentTool('select').selectNone()
