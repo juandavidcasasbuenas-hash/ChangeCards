@@ -227,7 +227,7 @@ export function activateRoute(editor, routeId, { author = getCurrentAuthor(), re
     }
     if (previous) editor.updateShape({ id, type: previous.type, meta: { ...previous.meta, routeActive: true } })
     else editor.createShape({ id, type: 'text', x: DEVELOP_X, y: baseY,
-      props: { richText: toRichText(`${route.name}\n${author.name === 'Explorer' ? 'Four moves. Follow the thread.' : `${author.name}’s route · four moves.`}`), font: 'draw', color: 'violet', size: 'l', autoSize: false, w: 1680 },
+      props: { richText: toRichText(`${route.name}\n${author.name === 'Explorer' ? 'Four moves. Follow the thread.' : `${author.name}’s route · four moves.`}`), font: 'sans', color: 'violet', size: 'l', autoSize: false, w: 1680 },
       meta: { ...routeMeta, developRouteHeader: true, routeActive: true, routeBaseY: baseY, routeShapeIds: ids } })
     route.cardIds.forEach((cardId, index) => {
       if (!editor.getShape(ids[index])) {
@@ -241,7 +241,7 @@ export function activateRoute(editor, routeId, { author = getCurrentAuthor(), re
       }
       const labelId = createShapeId(`${id.slice(6)}-label-${index + 1}`)
       if (!editor.getShape(labelId)) editor.createShape({ id: labelId, type: 'text', x: DEVELOP_X + index * 460, y: baseY + 122,
-        props: { richText: toRichText(`0${index + 1} / ${index === 0 ? 'Start here' : index === 3 ? 'A new direction' : 'Keep going'}`), font: 'draw', color: 'violet', size: 's', autoSize: false, w: CARD_W }, meta: routeMeta })
+        props: { richText: toRichText(`0${index + 1} / ${index === 0 ? 'Start here' : index === 3 ? 'A new direction' : 'Keep going'}`), font: 'sans', color: 'violet', size: 's', autoSize: false, w: CARD_W }, meta: routeMeta })
       if (index === 0) return
       const arrowId = createShapeId(`${id.slice(6)}-arrow-${index}`)
       const left = editor.getShape(ids[index - 1]), right = editor.getShape(ids[index])

@@ -53,7 +53,7 @@ export function addNote(editor, text = '', stage = 'discover') {
   const id = createShapeId()
   editor.markHistoryStoppingPoint('add-field-note')
   editor.createShape({ id, type: 'note', x: x - 100, y: y - 90, meta: { workshopStage: stage },
-    props: { color: 'yellow', size: 'm', font: 'draw', richText: toRichText(text) } })
+    props: { color: 'yellow', size: 'm', font: 'sans', richText: toRichText(text) } })
   editor.setCurrentTool('select').select(id)
   if (!text) editor.setEditingShape(id)
   editor.getContainer().focus({ preventScroll: true })

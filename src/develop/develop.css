@@ -13,7 +13,7 @@
 .dv-route-ribbon li button { display:flex; align-items:center; gap:7px; padding:0; border:0; background:none; font-size:11px; color:#695c4b; }
 .dv-route-ribbon li b { display:grid; place-items:center; border:1px solid #ad9980; border-radius:50%; width:23px; height:23px; font:11px 'DM Mono',monospace; }
 .dv-route-ribbon li .is-done b { background:#647856; border-color:#647856; color:white; }
-.dv-route-done { font:17px 'Kalam',cursive; color:#557941; white-space:nowrap; }
+.dv-route-done { font:600 14px 'DM Sans',sans-serif; color:#557941; white-space:nowrap; }
 .dv-icon-button { border:0; background:transparent; width:36px; height:36px; display:grid; place-items:center; flex-shrink:0; border-radius:50%; }
 .dv-icon-button:hover { background:#eee8f4; }
 .dv-dialog { color:#242329; width:min(840px,calc(100vw - 32px)); max-height:calc(100dvh - 40px); padding:30px; border:1px solid #8c8296; border-radius:12px; box-shadow:7px 8px 0 #3f305e20; font-family:'DM Sans',sans-serif; background:#fffefa; }
@@ -38,7 +38,7 @@
 .dv-saved-card h3 { font-size:30px; letter-spacing:-1px; line-height:1.1; margin:15px 0; }
 .dv-saved-card small { font:10px 'DM Mono',monospace; }
 .dv-saved-prompt { font-size:14px; line-height:1.6; }
-.dv-saved-writing { white-space:pre-wrap; font:24px/1.5 'Kalam',cursive; margin-top:28px; overflow-wrap:anywhere; }
+.dv-saved-writing { white-space:pre-wrap; font:400 20px/1.5 'DM Sans',sans-serif; margin-top:28px; overflow-wrap:anywhere; }
 .dv-saved-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .dv-saved-actions button { display:flex; align-items:center; gap:8px; padding:11px 15px; border:1px solid #c9bed3; border-radius:5px; font-size:12px; background:#fff; }
 .dv-saved-actions button:first-child { background:#665080; color:#fff; border-color:#665080; margin-right:auto; }

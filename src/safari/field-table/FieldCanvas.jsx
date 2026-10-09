@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BaseBoxShapeUtil, HTMLContainer, Tldraw, createShapeId, toRichText, useEditor, useValue } from 'tldraw'
+import { BaseBoxShapeUtil, DefaultFontStyle, HTMLContainer, Tldraw, createShapeId, toRichText, useEditor, useValue } from 'tldraw'
 import { evidenceProps, sourceProps, stationProps } from '../../../shared/safari-shapes.mjs'
 import { linkFor, rememberedSession } from '../collaboration/session-client.js'
 import { evidenceLabel } from '../field-guide.js'
@@ -11,6 +11,7 @@ import { CANVAS_KEY, CARD_W, CARD_H, STATION_W, STATION_HEADER_H, cardPosition, 
 import { SafariCanvasContext, useSafariCanvas } from './canvas-context.js'
 import { closeReading, readingSession, setPrivateReading, turnCard } from './card-reading.js'
 import { canvasMotion, ignorePointer, sid, visitStation } from './canvas-actions.js'
+import { CANVAS_ASSET_URLS } from './canvas-fonts.js'
 import { CanvasHeader, StationNav, CanvasProgress, CanvasToolbar, CanvasNavigation, CanvasStylePanel } from './CanvasChrome.jsx'
 import EvidenceReader from './EvidenceReader.jsx'
 import { CHANGE_SHAPES } from '../../develop/ChangeShapes.jsx'
@@ -125,7 +126,7 @@ const COMPONENTS = { MenuPanel: null, TopPanel: null, QuickActions: null, Action
 
 function textShape(id, text, x, y, props = {}, scaffolding = true) {
   return { id: sid(id), type: 'text', x, y, meta: { safariScaffolding: scaffolding }, props: {
-    richText: toRichText(text), font: 'draw', size: 'm', color: 'grey', autoSize: false, w: 430, ...props,
+    richText: toRichText(text), font: 'sans', size: 'm', color: 'grey', autoSize: false, w: 430, ...props,
   } }
 }
 
@@ -181,10 +182,10 @@ function migrateNotes(editor, safari, legacy) {
   for (const [cardId, note] of notes) {
     const card = safari.cards.find(item => item.id === cardId)
     if (!card) continue
-    editor.createShape(textShape(`old-note-${cardId}`, `${card.title}\n\n${note}`, x, 3090, { w: 370, size: 'm', font: 'draw', color: 'green' }, false))
+    editor.createShape(textShape(`old-note-${cardId}`, `${card.title}\n\n${note}`, x, 3090, { w: 370, size: 'm', font: 'sans', color: 'green' }, false))
     x += 430
   }
-  if (legacy.reflection) editor.createShape(textShape('old-reflection', `What changed my thinking\n\n${legacy.reflection}`, x, 3090, { w: 430, size: 'm', font: 'draw', color: 'green' }, false))
+  if (legacy.reflection) editor.createShape(textShape('old-reflection', `What changed my thinking\n\n${legacy.reflection}`, x, 3090, { w: 430, size: 'm', font: 'sans', color: 'green' }, false))
   legacy.threads.forEach((thread, i) => {
     const frameId = sid(`previous-${thread.id}`)
     editor.createShape({ id: frameId, type: 'frame', x: i * 900, y: 3500, props: { w: 830, h: 860, name: thread.title } })
@@ -193,7 +194,7 @@ function migrateNotes(editor, safari, legacy) {
       if (card) editor.createShape({ id: sid(`${thread.id}-${id}`), type: 'safari-evidence-card', parentId: frameId, x: 32 + j * 420, y: 35, props: { evidence: evidencePayload(safari, card) } })
     })
     const noteId = sid(`${thread.id}-interpretation`)
-    editor.createShape({ ...textShape(`${thread.id}-interpretation`, `${thread.observation}\n\n${thread.question}\n\nNext: ${thread.nextStep}`, 40, 440, { w: 745, size: 'm', font: 'draw', color: 'green' }, false), parentId: frameId })
+    editor.createShape({ ...textShape(`${thread.id}-interpretation`, `${thread.observation}\n\n${thread.question}\n\nNext: ${thread.nextStep}`, 40, 440, { w: 745, size: 'm', font: 'sans', color: 'green' }, false), parentId: frameId })
     for (const id of thread.cardIds) if (editor.getShape(sid(`${thread.id}-${id}`))) connect(editor, sid(`${thread.id}-${id}`), noteId)
   })
 }
@@ -299,6 +300,7 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
   const mounted = useCallback(editor => {
     const safari = latest.current
     setEditor(editor)
+    editor.setStyleForNextShapes(DefaultFontStyle, 'sans')
     const stopCreates = editor.sideEffects.registerBeforeCreateHandler('shape', (shape, source) => {
       if (source !== 'user' || shape.meta.workshopStage || shape.meta.safariScaffolding || shape.type.startsWith('safari-') || shape.type.startsWith('change-')) return shape
       return { ...shape, meta: { ...shape.meta, workshopStage: currentStage.current } }
@@ -356,7 +358,7 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
     <CanvasHeader editor={editor}/>{stage === 'develop' ? <DevelopChrome/> : <StationNav editor={editor}/>}
     <div className="esc-stage">
       {collaboration && collaboration.status !== 'online' && <div className="esc-sync-status" role="status">{collaboration.problem || (collaboration.status === 'loading' ? 'Connecting to the shared table…' : collaboration.status === 'error' ? 'The connection needs a refresh. Copy your notes before reopening.' : 'Reconnecting… Keep this tab open until your changes have synced.')}</div>}
-      <Tldraw shapeUtils={SAFARI_SHAPES} components={COMPONENTS} options={OPTIONS} {...(store ? { store } : { persistenceKey: CANVAS_KEY + safari.id })} onMount={mounted} licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY} inferDarkMode={false}>
+      <Tldraw shapeUtils={SAFARI_SHAPES} components={COMPONENTS} options={OPTIONS} assetUrls={CANVAS_ASSET_URLS} {...(store ? { store } : { persistenceKey: CANVAS_KEY + safari.id })} onMount={mounted} licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY} inferDarkMode={false}>
       <CanvasProgress/><EvidenceReader/>
       {stage === 'discover' && !findings && editor && !run?.busy && <div className="dv-empty-discover"><span aria-hidden="true">✳</span><h2>What could change<br/>how you see this?</h2><p>Follow six perspectives on your idea.<br/>Keep the findings here, alongside your work.</p><button onClick={research.start}>Find evidence <Icon name="arrow" size={17}/></button>{research.run?.error && <p role="alert">{research.run.error}</p>}</div>}
     </Tldraw></div>
