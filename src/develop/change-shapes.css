@@ -80,10 +80,10 @@
 .dvc-deck-meta > span:last-child { opacity: .65; }
 .dvc-deck-art { display: grid; place-items: center; flex: 1 1 auto; min-height: 156px; margin: 8px 0 13px; }
 .dvc-deck-art .dvc-doodle { width: 149px; height: 149px; }
+.dvc-deck-heading { margin-bottom: 28px; }
 .dvc-deck-heading > span { display: block; margin-bottom: 7px; font: 500 10px/1.1 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; }
 .dvc-deck-heading h2 { margin: 0; font: 750 36px/.94 'DM Sans', sans-serif; text-transform: uppercase; letter-spacing: -.055em; }
 .dvc-deck.dvc-category-multidisciplinary h2 { font-size: 25px; letter-spacing: -.058em; }
-.dvc-deck-top > p { min-height: 39px; margin: 13px 0 14px; font: 500 17px/1.14 'Kalam', cursive; text-wrap: pretty; }
 .dvc-deck-footer { display: flex; align-items: center; justify-content: space-between; flex: 0 0 50px; gap: 10px; padding-top: 7px; border-top: 1px solid #25212a45; }
 .dvc-deck-count { display: flex; align-items: center; gap: 7px; }
 .dvc-deck-count b { font: 500 24px/1 'DM Mono', monospace; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
