@@ -1,8 +1,8 @@
-import { createShapeId, toRichText, Box } from 'tldraw'
+import { createShapeId, createBindingId, toRichText, Box } from 'tldraw'
 import { CARDS, CURATED_ROUTES } from './catalog.js'
 import { DEVELOP_X, CATALOGUE_X, CARD_W, CARD_H, changeCardProps, templateShapes, stationShapes, workingPosition, legacyBoardState } from './model.js'
 import { readIdentity, saveIdentity } from '../safari/collaboration/session-client.js'
-import { focusShapes } from '../safari/field-table/canvas-actions.js'
+import { focusShapes, canvasMotion } from '../safari/field-table/canvas-actions.js'
 
 export const collectDevelopEntries = editor => editor.getCurrentPageShapes().filter(shape => shape.type === 'change-card' && !shape.props.template)
 export const getCurrentAuthor = () => readIdentity() || saveIdentity('Explorer')
@@ -34,11 +34,16 @@ function nextWorkingPosition(editor) {
 
 export function initializeDevelop(editor, { challenge, legacy = null }) {
   const page = editor.getCurrentPage()
-  if (page.meta.developInitialized || editor.getInstanceState().isReadonly) return false
+  if (editor.getInstanceState().isReadonly) return false
+  const oldHeading = editor.getShape('shape:develop-heading')
+  // Retire only the original scaffold; an edited heading is someone's work.
+  if (oldHeading?.meta.safariScaffolding && JSON.stringify(oldHeading.props.richText) === JSON.stringify(toRichText('Room for a different idea.'))) {
+    editor.run(() => editor.deleteShapes([oldHeading.id]), { history: 'ignore' })
+  }
+  if (page.meta.developInitialized) return false
   const imported = legacy ? legacyBoardState(legacy) : null
   const entries = imported?.entries.length ? imported.entries : [1, 5, 14].map((cardId, i) => ({ cardId, ...workingPosition(i) }))
   const shapes = [...templateShapes().map(shape => ({ ...shape, isLocked: true })), ...stationShapes().map(shape => ({ ...shape, isLocked: true })),
-    { id: 'shape:develop-heading', type: 'text', x: DEVELOP_X, y: -80, props: { richText: toRichText('Room for a different idea.'), font: 'draw', color: 'grey', size: 'xl', autoSize: false, w: 1350 }, meta: { workshopStage: 'develop', safariScaffolding: true } },
     { id: 'shape:develop-starting-idea', type: 'text', x: DEVELOP_X, y: 40, props: { richText: toRichText(challengePreview(challenge)), font: 'sans', color: 'black', size: 'm', autoSize: false, w: 1250 }, meta: { workshopStage: 'develop', startingIdea: true } },
     ...entries.map((entry, i) => ({ id: `shape:change-initial-${entry.cardId}`, type: 'change-card', x: entry.x ?? workingPosition(i).x, y: entry.y ?? workingPosition(i).y,
       props: changeCardProps(entry.cardId, { note: entry.note || '', draft: entry.draft || '', face: entry.face || 'front' }),
@@ -52,7 +57,7 @@ export function initializeDevelop(editor, { challenge, legacy = null }) {
   return true
 }
 
-export function showDevelop(editor, category = 'table', { animate = true } = {}) {
+export function showDevelop(editor, category = 'table', { animate = true, duration = 460 } = {}) {
   const inWorkingArea = shape => {
     const bounds = editor.getShapePageBounds(shape.id)
     return bounds && bounds.x >= 5700 && bounds.x < CATALOGUE_X
@@ -64,8 +69,8 @@ export function showDevelop(editor, category = 'table', { animate = true } = {})
   const mobileCard = category !== 'all' && editor.getViewportScreenBounds().w < 600
     ? shapes.find(shape => shape.type === 'change-card') || shapes.find(shape => shape.props.evidence)
     : null
-  if (shapes.length) focusShapes(editor, mobileCard ? [mobileCard] : shapes, { animate })
-  else editor.zoomToBounds(new Box(DEVELOP_X, 0, 1400, 850), { inset: 80, animation: { duration: animate ? 250 : 0 } })
+  if (shapes.length) focusShapes(editor, mobileCard ? [mobileCard] : shapes, { animate, duration })
+  else editor.zoomToBounds(new Box(DEVELOP_X, 0, 1400, 850), { inset: 80, animation: canvasMotion(editor, animate ? duration : 0) })
 }
 
 export function drawChangeCard(editor, cardId, { author = getCurrentAuthor(), copy = null, face = 'back', reuseUnowned = true } = {}) {
@@ -98,16 +103,95 @@ export function buildFromEvidence(editor, shape) {
   return editor.getShape(id)
 }
 
-export function activateRoute(editor, routeId) {
+const routeHeader = shape => shape.type === 'text' && shape.meta.developRouteHeader
+const routeShapeId = (routeId, authorId) => createShapeId(`change-route-${routeId}-${authorId}`)
+
+/** Each person's route is a set of native records, not a shared camera or turn. */
+export function getRouteState(editor, { author = getCurrentAuthor(), allowUnowned = true } = {}) {
+  if (!editor) return null
+  const headers = editor.getCurrentPageShapes().filter(shape => routeHeader(shape) && shape.meta.routeOwner === author.id)
+  const header = headers.find(shape => shape.meta.routeActive)
+  const routeId = header?.meta.routeId || (!headers.length ? editor.getCurrentPage().meta.developRoute : '')
   const route = CURATED_ROUTES.find(item => item.id === routeId)
-  if (!route || editor.getInstanceState().isReadonly) return
+  if (!route) return null
+  const entries = collectDevelopEntries(editor)
+  const cards = route.cardIds.map((cardId, index) => header
+    ? editor.getShape(header.meta.routeShapeIds[index]) || null
+    : entries.find(shape => shape.props.cardId === cardId && (shape.props.authorId === author.id || allowUnowned && !shape.props.authorId)) || null)
+  return { route, header, cards }
+}
+
+export function nextRouteCard(state, savedId) {
+  if (!state || !state.cards.some(shape => shape?.id === savedId)) return null
+  const index = state.cards.findIndex(shape => shape?.id === savedId)
+  return [...state.cards.slice(index + 1), ...state.cards.slice(0, index)].find(shape => shape && !shape.props.note.trim()) || null
+}
+
+export function showRoute(editor, state, options) {
+  if (!state) return
+  focusShapes(editor, [state.header, ...state.cards].filter(Boolean), options)
+}
+
+function routeBaseY(editor) {
+  const workingBounds = editor.getCurrentPageShapes().filter(shape => !shape.props.template && shape.type !== 'change-station')
+    .map(shape => editor.getShapePageBounds(shape.id)).filter(box => box && box.x < DEVELOP_X + 1780 && box.x + box.w > DEVELOP_X - 40)
+  return Math.max(930, ...workingBounds.map(box => box.y + box.h + 180))
+}
+
+export function activateRoute(editor, routeId, { author = getCurrentAuthor(), reuseUnowned = true } = {}) {
+  const route = CURATED_ROUTES.find(item => item.id === routeId)
+  if (!route || editor.getInstanceState().isReadonly) return null
+  const id = routeShapeId(routeId, author.id), previous = editor.getShape(id)
+  const entries = collectDevelopEntries(editor), baseY = previous?.meta.routeBaseY ?? routeBaseY(editor)
+  const ids = route.cardIds.map((_, index) => createShapeId(`${id.slice(6)}-step-${index + 1}`))
+  const routeMeta = { workshopStage: 'develop', routeId, routeOwner: author.id, routeHeaderId: id }
   editor.markHistoryStoppingPoint('choose-change-route')
-  const page = editor.getCurrentPage(), entries = collectDevelopEntries(editor)
   editor.run(() => {
-    for (const cardId of route.cardIds) if (!entries.some(shape => shape.props.cardId === cardId)) editor.createShape({ id: createShapeId(), type: 'change-card',
-      ...nextWorkingPosition(editor), props: changeCardProps(cardId), meta: { workshopStage: 'develop' } })
-    editor.updatePage({ id: page.id, meta: { ...page.meta, developRoute: routeId } })
+    // Active route is per person. Selecting one does not switch anyone else's
+    // ribbon, and no camera data ever enters the shared document.
+    for (const header of editor.getCurrentPageShapes().filter(shape => routeHeader(shape) && shape.meta.routeOwner === author.id && shape.id !== id)) {
+      editor.updateShape({ id: header.id, type: header.type, meta: { ...header.meta, routeActive: false } })
+    }
+    if (previous) editor.updateShape({ id, type: previous.type, meta: { ...previous.meta, routeActive: true } })
+    else editor.createShape({ id, type: 'text', x: DEVELOP_X, y: baseY,
+      props: { richText: toRichText(`${route.name}\n${author.name === 'Explorer' ? 'Four moves. Follow the thread.' : `${author.name}’s route · four moves.`}`), font: 'draw', color: 'violet', size: 'l', autoSize: false, w: 1680 },
+      meta: { ...routeMeta, developRouteHeader: true, routeActive: true, routeBaseY: baseY, routeShapeIds: ids } })
+    route.cardIds.forEach((cardId, index) => {
+      if (!editor.getShape(ids[index])) {
+        // A route has its own working copies. Earlier work stays where it was,
+        // and another participant's writing is never claimed or overwritten.
+        const source = entries.filter(shape => shape.props.cardId === cardId && (shape.props.authorId === author.id || reuseUnowned && !shape.props.authorId))
+          .sort((a, b) => (b.meta.savedAt || 0) - (a.meta.savedAt || 0))[0]
+        editor.createShape({ id: ids[index], type: 'change-card', x: DEVELOP_X + index * 460, y: baseY + 180,
+          props: changeCardProps(cardId, { authorId: author.id, authorName: author.name, ...(source ? { note: source.props.note, draft: source.props.draft, sparks: [...source.props.sparks], face: source.props.note ? 'back' : 'front' } : {}) }),
+          meta: { ...routeMeta, routeStep: index + 1, ...(source ? { basedOnCard: source.id, developDrafting: Boolean(source.meta.developDrafting), savedAt: source.meta.savedAt || 0 } : {}) } })
+      }
+      const labelId = createShapeId(`${id.slice(6)}-label-${index + 1}`)
+      if (!editor.getShape(labelId)) editor.createShape({ id: labelId, type: 'text', x: DEVELOP_X + index * 460, y: baseY + 122,
+        props: { richText: toRichText(`0${index + 1} / ${index === 0 ? 'Start here' : index === 3 ? 'A new direction' : 'Keep going'}`), font: 'draw', color: 'violet', size: 's', autoSize: false, w: CARD_W }, meta: routeMeta })
+      if (index === 0) return
+      const arrowId = createShapeId(`${id.slice(6)}-arrow-${index}`)
+      const left = editor.getShape(ids[index - 1]), right = editor.getShape(ids[index])
+      if (!editor.getShape(arrowId)) editor.createShape({ id: arrowId, type: 'arrow', x: left.x + CARD_W, y: left.y + CARD_H / 2,
+        props: { start: { x: 0, y: 0 }, end: { x: right.x - left.x - CARD_W, y: right.y - left.y }, bend: index % 2 ? -24 : 24, color: 'violet', dash: 'draw', size: 'm', arrowheadStart: 'none', arrowheadEnd: 'arrow' }, meta: routeMeta })
+      for (const [terminal, card, x] of [['start', left, 1], ['end', right, 0]]) {
+        const bindingId = createBindingId(`${id.slice(6)}-${index}-${terminal}`)
+        if (!editor.getBinding(bindingId)) editor.createBinding({ id: bindingId, type: 'arrow', fromId: arrowId, toId: card.id,
+          props: { terminal, normalizedAnchor: { x, y: 0.5 }, isExact: false, isPrecise: true, snap: 'none' } })
+      }
+    })
   })
+  return getRouteState(editor, { author, allowUnowned: reuseUnowned })
+}
+
+export function leaveRoute(editor, { author = getCurrentAuthor() } = {}) {
+  if (editor.getInstanceState().isReadonly) return
+  const state = getRouteState(editor, { author })
+  if (state?.header) editor.updateShape({ id: state.header.id, type: state.header.type, meta: { ...state.header.meta, routeActive: false } })
+  else {
+    const page = editor.getCurrentPage()
+    editor.updatePage({ id: page.id, meta: { ...page.meta, developRoute: '' } })
+  }
 }
 
 export function changeCardMarkdown(shape) {

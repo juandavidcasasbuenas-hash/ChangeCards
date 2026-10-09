@@ -1,0 +1,18 @@
+.dv-route-icon { width:29px; height:20px; fill:none; stroke:currentColor; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.dv-route-icon rect { fill:#f7eabc; }
+.dv-route-icon rect:nth-of-type(2) { fill:#e0d6ed; }
+.dv-route-icon rect:nth-of-type(3) { fill:#c7e1de; }
+.dv-route-overview { display:flex; align-items:center; gap:10px; padding:3px 0; text-align:left; border:0; background:none; color:#4e3f5b; flex-shrink:0; cursor:pointer; }
+.dv-route-overview strong { display:block; font-size:12px; }
+.dv-route-overview:hover strong { text-decoration:underline; text-underline-offset:3px; }
+.dv-route-ribbon li + li { position:relative; }
+.dv-route-ribbon li + li::before { content:'→'; position:absolute; left:-15px; top:4px; color:#b4a587; font:12px 'DM Sans',sans-serif; }
+.dv-route-ribbon li [aria-current="step"] b { outline:2px solid #725691; outline-offset:3px; }
+.dv-route-ribbon li [aria-current="step"] span { color:#352441; font-weight:700; }
+.dv-route-ribbon li [aria-current="step"].is-done b { outline-color:#647856; }
+@media(max-width:640px) {
+  .dv-route-overview { max-width:145px; gap:7px; }
+  .dv-route-overview .dv-route-icon { display:none; }
+  .dv-route-ribbon ol { gap:16px; }
+  .dv-route-ribbon li + li::before { left:-12px; }
+}

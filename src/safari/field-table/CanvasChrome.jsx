@@ -48,7 +48,7 @@ export function CanvasHeader({ editor }) {
     exportMenu.current.open = false
   }
   return <header className="esc-header">
-    <button className="esc-brand" onClick={() => run?.onHome ? run.onHome() : location.assign(stage === 'develop' ? '/develop' : '/safari/')} aria-label={stage === 'develop' ? 'Change Cards home' : 'Evidence Safari home'}><span>{stage === 'develop' ? 'CHANGE' : 'EVIDENCE'}<br/>{stage === 'develop' ? 'CARDS' : 'SAFARI'}<span className="esc-brand-star">✳</span></span></button>
+    <button className="esc-brand" onClick={() => run?.onHome ? run.onHome(stage) : location.assign(stage === 'develop' ? '/develop' : '/safari/')} aria-label="Workshop home"><span>CHANGE<br/>CARDS<span className="esc-brand-star">✳</span></span></button>
     <DesignPhase stage={stage} onChange={setStage}/>
     <details className="esc-question"><summary><span><small>The question we came with</small><strong>{safari.challenge}</strong></span><Icon name="down" size={16}/></summary><p>{safari.challenge}</p></details>
     <Invite editor={editor}/>
@@ -91,18 +91,20 @@ export function StationNav({ editor }) {
 }
 
 export function CanvasProgress() {
-  const { safari, run } = useSafariCanvas()
+  const { safari, run, setStage } = useSafariCanvas()
   const editor = useEditor()
   const [now, setNow] = useState(Date.now())
   useEffect(() => { if (!run?.busy) return; const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer) }, [run?.busy])
+  const cards = useValue('arriving research', () => evidenceShapes(editor).map(shape => shape.props.evidence.card), [editor])
   if (!run?.busy && !run?.error && !run?.notice) return null
-  const count = safari.cards.length
-  const headline = run.error ? 'Your finds are here to keep.' : !run.busy ? run.notice : count ? `${count} finds on the table. More on the way.` : run.progress?.stage === 'searching' ? 'Following six leads…' : 'Looking for a fresh perspective…'
+  const count = cards.length
+  const headline = run.error ? (count ? 'Your finds are here to keep.' : 'The search paused. Your board is saved.') : !run.busy ? run.notice : count ? `${count} finds on the table. More on the way.` : run.progress?.stage === 'searching' ? 'Following six leads…' : 'Looking for a fresh perspective…'
   return <div className={`esc-progress ${run.busy ? 'is-working' : ''}`} data-research-busy={Boolean(run.busy)} onPointerDown={ignorePointer} onKeyDown={ignorePointer}>
+    {run.busy && <div className="esc-progress-map" aria-hidden="true"><svg className="esc-progress-path" viewBox="0 0 300 65" preserveAspectRatio="none"><path d="M14 44C32 8 53 70 79 30S116 4 144 32 181 65 207 31 253 4 286 31"/></svg>{LENSES.map((lens, index) => <span key={lens} className={cards.some(card => card.lens === lens) ? 'is-found' : ''} style={{ '--trail-color': LENS_COLORS[lens], '--trail-order': index }}><Doodle lens={lens}/><i/></span>)}</div>}
     <div className="esc-progress-copy" role="status" aria-live="polite"><span className="esc-progress-spark" aria-hidden="true">✳</span><strong>{headline}</strong>{run?.error && <p>{run.error}</p>}</div>
-    <div className="esc-progress-bottom"><span className="esc-progress-trails" aria-label={`${new Set(safari.cards.map(card => card.lens)).size} of six perspectives on the table`}>{LENSES.map(lens => <i key={lens} title={`${lens}: ${trailStatus(lens, run.progress, run.busy)}`} className={safari.cards.some(card => card.lens === lens) ? 'has-finds' : ''} style={{ '--trail-color': LENS_COLORS[lens] }}/>)}</span>
-      {run.busy && <time aria-label="Elapsed time">{formatDuration(Math.max(0, now - run.startedAt))}</time>}
-      {count > 0 && run.busy && <button className="esc-latest" onClick={() => { const last = evidenceShapes(editor).at(-1); if (last) turnCard(editor, last) }}>See latest<Icon name="arrow" size={14}/></button>}
+    <div className="esc-progress-bottom"><span className="esc-progress-trails" aria-label={`${new Set(cards.map(card => card.lens)).size} of six perspectives on the table`}>{LENSES.map(lens => <i key={lens} title={`${lens}: ${trailStatus(lens, run.progress, run.busy)}`} className={cards.some(card => card.lens === lens) ? 'has-finds' : ''} style={{ '--trail-color': LENS_COLORS[lens] }}/>)}</span>
+      {run.busy && <time aria-label="Elapsed time">{formatDuration(Math.max(0, now - (run.startedAt || now)))}</time>}
+      {count > 0 && run.busy && <button className="esc-latest" onClick={() => { const last = evidenceShapes(editor).at(-1); if (last) { setStage('discover'); turnCard(editor, last) } }}>See latest<Icon name="arrow" size={14}/></button>}
       {run.busy && (run.onStop || run.onHome) && <button className="esc-stop" onClick={run.onStop || run.onHome}>{count ? 'Stop here' : 'Cancel'}</button>}
     </div>
   </div>

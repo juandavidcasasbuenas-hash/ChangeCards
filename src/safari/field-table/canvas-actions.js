@@ -5,15 +5,18 @@ import { seenFindings, turnCard } from './card-reading.js'
 
 export const sid = id => createShapeId(`evidence-${id}`)
 export const ignorePointer = event => event.stopPropagation()
-export const canvasMotion = editor => ({ duration: editor.getContainerWindow().matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 320 })
+export const canvasMotion = (editor, duration = 460) => ({
+  duration: editor.getContainerWindow().matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : duration,
+  easing: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+})
 export const evidenceShapes = (editor, includeDevelop = false) => editor.getCurrentPageShapes().filter(shape => shape.props.evidence?.card?.id && (includeDevelop || !shape.meta.developmentSeed))
 
-export function focusShapes(editor, shapes, { animate = true } = {}) {
+export function focusShapes(editor, shapes, { animate = true, duration = 460 } = {}) {
   const boxes = shapes.map(shape => editor.getShapePageBounds(shape.id)).filter(Boolean)
   if (!boxes.length) return
   editor.setCurrentTool('select').selectNone()
   editor.zoomToBounds(Box.Common(boxes), { inset: editor.getViewportScreenBounds().w < 600 ? 56 : 164, targetZoom: 1,
-    animation: animate ? canvasMotion(editor) : { duration: 0 } })
+    animation: animate ? canvasMotion(editor, duration) : { duration: 0 } })
 }
 
 export function visitStation(editor, lens, options) {

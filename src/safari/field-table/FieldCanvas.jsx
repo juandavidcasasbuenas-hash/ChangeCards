@@ -10,7 +10,7 @@ import { LENS_COLORS, readTable, safeSourceUrl } from './model.js'
 import { CANVAS_KEY, CARD_W, CARD_H, STATION_W, STATION_HEADER_H, cardPosition, evidencePayload, incomingEvidence, isOriginalPilePosition, sourceCardMigration, stationPosition, wrapSvgText } from './canvas-model.js'
 import { SafariCanvasContext, useSafariCanvas } from './canvas-context.js'
 import { closeReading, readingSession, setPrivateReading, turnCard } from './card-reading.js'
-import { ignorePointer, sid, visitStation } from './canvas-actions.js'
+import { canvasMotion, ignorePointer, sid, visitStation } from './canvas-actions.js'
 import { CanvasHeader, StationNav, CanvasProgress, CanvasToolbar, CanvasNavigation, CanvasStylePanel } from './CanvasChrome.jsx'
 import EvidenceReader from './EvidenceReader.jsx'
 import { CHANGE_SHAPES } from '../../develop/ChangeShapes.jsx'
@@ -22,6 +22,7 @@ import { useDiscoveryResearch } from '../../develop/useDiscoveryResearch.js'
 import DevelopChrome from '../../develop/DevelopChrome.jsx'
 import 'tldraw/tldraw.css'
 import './field-table.css'
+import './workshop-canvas.css'
 
 const OPTIONS = { maxPages: 1 }
 const updatingCanvas = new WeakSet()
@@ -31,7 +32,8 @@ function CardFace({ shape }) {
   const { card = {}, source } = shape.props.evidence || {}
   const enabled = useValue('card controls', () => ['select', 'hand'].includes(editor.getCurrentToolId()), [editor])
   const reading = useValue('reading this card', () => readingSession(editor).get()?.shapeId === shape.id, [editor, shape.id])
-  const [arriving] = useState(() => Date.now() - (shape.meta.safariArrivedAt || 0) < 1500)
+  const [arriving, setArriving] = useState(() => Date.now() - (shape.meta.safariArrivedAt || 0) < 1500)
+  useEffect(() => { if (!arriving) return; const timer = setTimeout(() => setArriving(false), 1400); return () => clearTimeout(timer) }, [arriving])
   return <HTMLContainer style={{ width: shape.props.w, height: shape.props.h }}>
     <article className="esc-evidence" data-evidence-id={card.id} data-card-face="front" data-reading={reading || undefined} data-arriving={arriving || undefined}
       aria-label={`Evidence card: ${card.title}`} style={{ width: CARD_W, height: shape.props.h * CARD_W / shape.props.w, transform: `scale(${shape.props.w / CARD_W})`, '--evidence-color': LENS_COLORS[card.lens], '--arrival-delay': `${(shape.meta.safariArrivalOrder || 0) * 60}ms` }}>
@@ -225,9 +227,11 @@ export default function FieldCanvas({ safari, run = null }) {
 }
 
 export function CanvasSurface({ safari: initialSafari, run: outerRun = null, store = null, collaboration = null }) {
-  const legacy = useRef(null), latest = useRef(initialSafari), untouched = useRef(true), cameras = useRef({})
+  const legacy = useRef(null), latest = useRef(initialSafari), cameras = useRef({})
   const [editor, setEditor] = useState(null)
   const [stage, updateStage] = useState(() => collaboration?.stage || initialSafari.defaultStage || (initialSafari.kind === 'develop' ? 'develop' : 'discover'))
+  const cameraFrame = useRef(null), travellingUntil = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(cameraFrame.current), [])
   const currentStage = useRef(stage)
   currentStage.current = stage
   const research = useDiscoveryResearch({ editor, collaboration, safari: initialSafari, appendEvidence, seedCanvas: (editor, safari) => seedCanvas(editor, safari, readTable(safari)) })
@@ -237,36 +241,43 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
   latest.current = safari
   if (!legacy.current) legacy.current = readTable(safari)
   const setActiveLens = useCallback(lens => {
-    untouched.current = false; updateActiveLens(lens)
+    updateActiveLens(lens)
     if (editor && !collaboration) editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
   }, [editor, collaboration])
   const setStage = useCallback((next, { focus = true } = {}) => {
-    if (!editor || editor.isDisposed) return
+    if (!editor || editor.isDisposed || next === currentStage.current) return
     if (next === 'develop' && editor.getInstanceState().isReadonly && !editor.getCurrentPage().meta.developInitialized) return
-    untouched.current = false
     closeReading(editor); setShelf(false)
-    cameras.current[stage] = editor.getCamera()
+    cancelAnimationFrame(cameraFrame.current)
+    if (Date.now() >= travellingUntil.current) {
+      cameras.current[currentStage.current] = { ...editor.getCamera() }
+    }
+    currentStage.current = next
     if (next === 'develop') {
       initializeDevelop(editor, { challenge: safari.challenge, legacy: safari.legacy })
       try { rememberBoard({ ...safari, defaultStage: 'develop' }) } catch { /* Native canvas persistence remains available. */ }
     } else if (!editor.getCurrentPage().meta.safariSeedComplete && !editor.getInstanceState().isReadonly) seedCanvas(editor, { ...safari, cards: [], sources: [] }, readTable(safari))
     updateStage(next)
+    outerRun?.onPhaseChange?.(next)
     if (!collaboration) { const page = editor.getCurrentPage(); editor.run(() => editor.updatePage({ id: page.id, meta: { ...page.meta, workshopStage: next } }), { history: 'ignore' }) }
     if (!focus) return
-    requestAnimationFrame(() => {
-      if (editor.isDisposed) return
-      if (cameras.current[next]) editor.setCamera(cameras.current[next])
-      else if (next === 'develop') showDevelop(editor)
-      else visitStation(editor, activeLens)
+    travellingUntil.current = Date.now() + canvasMotion(editor, 900).duration
+    cameraFrame.current = requestAnimationFrame(() => {
+      cameraFrame.current = requestAnimationFrame(() => {
+        if (editor.isDisposed) return
+        if (cameras.current[next]) editor.setCamera(cameras.current[next], { animation: canvasMotion(editor, 900) })
+        else if (next === 'develop') showDevelop(editor, 'table', { duration: 900 })
+        else visitStation(editor, activeLens, { duration: 900 })
+      })
     })
-  }, [editor, stage, safari, collaboration, activeLens])
+  }, [editor, stage, safari, collaboration, activeLens, outerRun?.onPhaseChange])
   const develop = useDevelopController({ editor, safari, collaboration, setStage })
   const buildOnFinding = useCallback(shape => {
     if (!editor || editor.getInstanceState().isReadonly) return
     initializeDevelop(editor, { challenge: safari.challenge })
     buildFromEvidence(editor, shape)
-    setStage('develop')
-    requestAnimationFrame(() => { if (!editor.isDisposed) showDevelop(editor) })
+    setStage('develop', { focus: false })
+    cameraFrame.current = requestAnimationFrame(() => { if (!editor.isDisposed) showDevelop(editor, 'table', { duration: 900 }) })
   }, [editor, safari.challenge, setStage])
   const context = { safari: { ...safari, defaultStage: stage }, run, activeLens, setActiveLens, shelf, setShelf, collaboration, stage, setStage, buildOnFinding }
   const findings = useValue('discovery available', () => editor?.getCurrentPageShapes().filter(shape => shape.props.evidence && !shape.meta.developmentSeed).length || 0, [editor])
@@ -274,17 +285,15 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
     if (!editor || editor.isDisposed || !collaboration) return
     const offline = collaboration.status !== 'online'
     editor.updateInstanceState({ isReadonly: offline })
+    if (!offline && editor.getCurrentPage().meta.developInitialized) initializeDevelop(editor, { challenge: safari.challenge })
     const warn = event => { event.preventDefault(); event.returnValue = '' }
     if (offline) window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [editor, collaboration?.status])
   useEffect(() => {
     if (!editor || editor.isDisposed || collaboration || research.researchSafari || !editor.getCurrentPage().meta.safariSeedComplete) return
-    const { additions, first } = appendEvidence(editor, safari)
-    if (first && additions.length && untouched.current) {
-      const lens = additions[0].lens; updateActiveLens(lens); visitStation(editor, lens)
-      editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
-    }
+    // Evidence arrives into the current view. Only the explorer moves the camera.
+    appendEvidence(editor, safari)
   }, [editor, safari, collaboration, research.researchSafari])
   const mounted = useCallback(editor => {
     const safari = latest.current
@@ -339,10 +348,7 @@ export function CanvasSurface({ safari: initialSafari, run: outerRun = null, sto
       return next
     })
     const stopDeletes = editor.sideEffects.registerAfterDeleteHandler('shape', shape => { if (readingSession(editor).get()?.shapeId === shape.id) closeReading(editor) })
-    const container = editor.getContainer()
-    const interact = () => { untouched.current = false }
-    for (const event of ['pointerdown', 'wheel', 'keydown']) container.addEventListener(event, interact, { passive: true })
-    return () => { stopCreates(); stopChanges(); stopDeletes(); for (const event of ['pointerdown', 'wheel', 'keydown']) container.removeEventListener(event, interact) }
+    return () => { stopCreates(); stopChanges(); stopDeletes() }
   }, [])
   return <SafariCanvasContext.Provider value={context}><DevelopContext.Provider value={{ ...develop, safari }}><div className="esc-workbench" data-workshop-stage={stage} data-research-busy={Boolean(run?.busy)}>
     <CanvasHeader editor={editor}/>{stage === 'develop' ? <DevelopChrome/> : <StationNav editor={editor}/>}

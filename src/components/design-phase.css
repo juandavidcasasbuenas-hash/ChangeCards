@@ -1,0 +1,15 @@
+.workshop-phases.workshop-phase-switch { position:relative; display:grid; grid-template-columns:74px auto; align-items:center; gap:8px; padding:5px 7px 5px 9px; border:1px solid #d9d3dc; border-radius:7px; background:#fffefa; }
+.workshop-phase-switch .workshop-double-diamond { width:74px; height:29px; overflow:visible; color:#766282; }
+.workshop-double-diamond > path { stroke:currentColor; stroke-width:1.25; stroke-linejoin:round; fill:transparent; transition:fill 320ms ease,stroke 320ms ease,opacity 320ms ease; }
+.workshop-double-diamond .workshop-diamond-fold { opacity:.23; }
+.workshop-phase-switch[data-stage="discover"] .workshop-diamond-discover { fill:#e8b847; stroke:#97772d; }
+.workshop-phase-switch[data-stage="develop"] .workshop-diamond-develop { fill:#b9a5cd; stroke:#665080; }
+.workshop-phase-switch .workshop-phase-labels { position:relative; display:flex; align-items:center; gap:2px; }
+.workshop-phase-switch .workshop-phase-labels::before { content:''; position:absolute; inset:0 50% 0 0; border-radius:4px; background:#f4e9c9; transition:transform 320ms cubic-bezier(.2,.8,.2,1),background 320ms ease; pointer-events:none; }
+.workshop-phase-switch[data-stage="develop"] .workshop-phase-labels::before { transform:translateX(100%); background:#ece4f2; }
+.workshop-phase-switch .workshop-phase-labels > a,.workshop-phase-switch .workshop-phase-labels > button { position:relative; z-index:1; width:81px; padding:9px 6px; display:block; text-align:center; border:0; background:none; border-radius:4px; font:600 12px 'DM Sans',sans-serif; color:#756c7c; box-shadow:none; text-decoration:none; }
+.workshop-phase-switch .workshop-phase-labels > [aria-current="step"] { color:#312738; background:none; box-shadow:none; }
+.workshop-phase-switch .workshop-phase-labels > :hover { color:#312738; }
+.workshop-phase-switch .workshop-phase-labels > :focus-visible { outline:2px solid #665080; outline-offset:3px; }
+@media(max-width:720px) { .workshop-phases.workshop-phase-switch { grid-template-columns:57px auto; gap:4px; padding:5px; } .workshop-phase-switch .workshop-double-diamond { width:57px; height:25px; } .workshop-phase-switch .workshop-phase-labels > a,.workshop-phase-switch .workshop-phase-labels > button { width:70px; padding:9px 4px; font-size:11px; } }
+@media(prefers-reduced-motion:reduce) { .workshop-phase-switch *, .workshop-phase-switch ::before { transition:none !important; } }

@@ -8,8 +8,7 @@ const App = lazy(() => /^\/safari\/session\//.test(window.location.pathname)
   ? import('./safari/collaboration/SharedSafari.jsx')
   : /^\/safari\/field-table\/?$/.test(window.location.pathname)
   ? import('./safari/field-table/FieldTable.jsx')
-  : /^\/safari(?:\/|$)/.test(window.location.pathname)
-    ? import('./safari/Safari.jsx') : new URLSearchParams(location.search).has('room') ? import('./App.jsx') : import('./develop/DevelopApp.jsx'))
+  : new URLSearchParams(location.search).has('room') ? import('./App.jsx') : import('./workshop/WorkshopApp.jsx'))
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

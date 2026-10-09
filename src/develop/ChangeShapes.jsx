@@ -31,14 +31,53 @@ function TurnIcon() {
 function SparkStrip({ shape, disabled, enabled, onTake }) {
   const context = useDevelop()
   const [index, setIndex] = useState(0)
+  const [visible, setVisible] = useState(true)
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [pressed, setPressed] = useState(false)
+  const [hidden, setHidden] = useState(() => document.visibilityState === 'hidden')
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false)
   const state = context?.sparksState?.[shape.id]
   const sparks = state?.sparks?.length ? state.sparks : shape.props.sparks || []
   const loading = state?.status === 'loading' || state?.loading
   const spark = sparks[index % Math.max(1, sparks.length)]
-  return <div className="dvc-spark-strip" {...isolate} onWheel={stop}>
+  const sparkKey = sparks.join('\u0000')
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    const onVisibility = () => setHidden(document.visibilityState === 'hidden')
+    const onMotion = () => setReducedMotion(Boolean(media?.matches))
+    document.addEventListener('visibilitychange', onVisibility)
+    media?.addEventListener('change', onMotion)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      media?.removeEventListener('change', onMotion)
+    }
+  }, [])
+
+  useEffect(() => { setIndex(0); setVisible(true) }, [sparkKey])
+
+  useEffect(() => {
+    setVisible(true)
+    // These are already-cached thoughts. Browsing them never requests more AI.
+    if (sparks.length < 2 || loading || !enabled || hovered || focused || pressed || hidden || reducedMotion) return
+    const fadeTimer = window.setTimeout(() => setVisible(false), 5000)
+    const nextTimer = window.setTimeout(() => setIndex(current => current + 1), 6200)
+    return () => { window.clearTimeout(fadeTimer); window.clearTimeout(nextTimer) }
+  }, [sparks.length, sparkKey, index, loading, enabled, hovered, focused, pressed, hidden, reducedMotion])
+
+  const next = () => { setVisible(true); setIndex(current => current + 1) }
+  return <div className="dvc-spark-strip" {...isolate} onWheel={stop} aria-label="AI-generated writing sparks"
+    onPointerEnter={event => { if (event.pointerType !== 'touch') setHovered(true) }}
+    onPointerLeave={() => { setHovered(false); setPressed(false) }}
+    onPointerDown={event => { stop(event); setPressed(true) }}
+    onPointerUp={event => { stop(event); setPressed(false) }}
+    onPointerCancel={() => setPressed(false)}
+    onFocusCapture={() => setFocused(Boolean(spark))}
+    onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }}>
     {loading ? <span className="dvc-catching" role="status"><i aria-hidden="true">✦</i>Catching a thought…</span>
       : state?.error ? <button type="button" className="dvc-spark-request" onClick={() => context?.requestCardSparks(shape.id)} disabled={disabled} tabIndex={enabled ? 0 : -1} title={state.error}>Try a spark again <span aria-hidden="true">↻</span></button>
-      : spark ? <><button type="button" className="dvc-spark-thought" onClick={() => onTake(spark)} disabled={disabled} tabIndex={enabled ? 0 : -1} aria-label={`Use this AI spark: ${spark}`} title={spark}><i aria-hidden="true">✦</i><span>{spark}</span></button>{sparks.length > 1 && <button type="button" className="dvc-spark-next" onClick={() => setIndex(current => current + 1)} tabIndex={enabled ? 0 : -1} aria-label="Next spark" title="Next spark">↻</button>}</>
+      : spark ? <><button type="button" className={`dvc-spark-thought${visible ? ' is-visible' : ''}`} data-spark={spark} onClick={() => onTake(spark)} disabled={disabled} tabIndex={enabled ? 0 : -1} aria-label={`Use this AI spark: ${spark}`} title={spark}><i aria-hidden="true">✦</i><span>{spark}</span></button>{sparks.length > 1 && <button type="button" className="dvc-spark-next" onClick={next} tabIndex={enabled ? 0 : -1} aria-label="Next spark" title="Next spark">↻</button>}</>
       : <button type="button" className="dvc-spark-request" onClick={() => context?.requestCardSparks(shape.id)} disabled={disabled} tabIndex={enabled ? 0 : -1}><i aria-hidden="true">✦</i>Need a spark?</button>}
   </div>
 }
@@ -181,14 +220,15 @@ function SvgCard({ shape, artworkSrc }) {
   const noteY = questionY + question.length * 19 + 24
   const noteLines = Math.max(1, Math.floor((h - 48 - noteY) / 21))
   return <g transform={`scale(${shape.props.w / CARD_W})`}>
-    <rect x="1" y="1" width={w - 2} height={h - 2} rx="7" fill={back ? '#25212a' : color} stroke="#28242b" strokeOpacity=".6"/>
-    <text x="22" y="31" fontFamily="sans-serif" fontSize="10" fill={back ? color : '#25212a'}>{card.label}</text>
+    <rect x="1" y="1" width={w - 2} height={h - 2} rx="7" fill={back ? '#fffdf7' : color} stroke="#28242b" strokeOpacity=".6"/>
+    {back && <path d={`M8 4.5H${w - 8}`} stroke={color} strokeWidth="7" strokeLinecap="round"/>}
+    <text x="22" y="31" fontFamily="sans-serif" fontSize="10" fill="#625d61">{card.label}</text>
     {!back && artworkSrc && <svg x="79" y="65" width="142" height="135" viewBox={sprite ? `${(artwork.spriteIndex % 6) * 100} ${Math.floor(artwork.spriteIndex / 6) * 100} 100 100` : '0 0 100 100'}><image href={artworkSrc} x="0" y="0" width={sprite ? 600 : 100} height={sprite ? 400 : 100}/></svg>}
-    {title.map((line, i) => <text key={`title-${i}`} x="22" y={titleY + i * (back ? 27 : 33)} fontFamily="sans-serif" fontSize={back ? 23 : 34} fontWeight="750" fill={back ? '#fffdf6' : '#25212a'}>{line}</text>)}
-    {back && question.map((line, i) => <text key={`question-${i}`} x="22" y={questionY + i * 19} fontSize="15" fontFamily="sans-serif" fill="#dcd5e3">{line}</text>)}
-    {back && notes.slice(0, noteLines).map((line, i) => <text key={`note-${i}`} x="22" y={noteY + i * 21} fontSize="15" fontFamily="sans-serif" fill="#fffdf6">{line}{i === noteLines - 1 && notes.length > noteLines ? '…' : ''}</text>)}
-    <line x1="22" x2={w - 22} y1={h - 44} y2={h - 44} stroke={back ? '#fffdf6' : '#25212a'} strokeOpacity=".2"/>
-    <text x="22" y={h - 20} fontSize="10" fontFamily="sans-serif" fill={back ? color : '#25212a'}>{back ? shape.props.authorName || 'Your take' : 'CHANGE CARDS'}</text>
+    {title.map((line, i) => <text key={`title-${i}`} x="22" y={titleY + i * (back ? 27 : 33)} fontFamily="sans-serif" fontSize={back ? 23 : 34} fontWeight="750" fill="#25212a">{line}</text>)}
+    {back && question.map((line, i) => <text key={`question-${i}`} x="22" y={questionY + i * 19} fontSize="15" fontFamily="sans-serif" fill="#4d474b">{line}</text>)}
+    {back && notes.slice(0, noteLines).map((line, i) => <text key={`note-${i}`} x="22" y={noteY + i * 21} fontSize="15" fontFamily="sans-serif" fill="#25212a">{line}{i === noteLines - 1 && notes.length > noteLines ? '…' : ''}</text>)}
+    <line x1="22" x2={w - 22} y1={h - 44} y2={h - 44} stroke="#25212a" strokeOpacity=".2"/>
+    <text x="22" y={h - 20} fontSize="10" fontFamily="sans-serif" fill="#25212a">{back ? shape.props.authorName || 'Your take' : 'CHANGE CARDS'}</text>
   </g>
 }
 

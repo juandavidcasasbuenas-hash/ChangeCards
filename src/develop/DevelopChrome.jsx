@@ -6,14 +6,24 @@ import { changeCardMarkdown } from './canvas-actions.js'
 import { Icon } from '../safari/primitives.jsx'
 import { copyText } from '../safari/field-guide.js'
 import './develop.css'
+import './routes.css'
 
 export function CategoryMark({ cardId }) {
   const art = cardArtwork(CARDS.find(card => card.id === cardId))
   return <span className="dv-category-mark" aria-hidden="true" style={{ backgroundImage: `url(${art.src})`, ...(art.spriteIndex !== undefined ? { backgroundSize: '600% 400%', backgroundPosition: `${art.spriteIndex % 6 * 20}% ${Math.floor(art.spriteIndex / 6) * 100 / 3}%` } : {}) }}/>
 }
 
+function RouteIcon() {
+  return <svg className="dv-route-icon" viewBox="0 0 30 20" aria-hidden="true">
+    <path d="M7.5 6.2c3.2 0 3.2 6.7 7.5 6.7s4.3-6.7 7.5-6.7"/>
+    <rect x="1.5" y="2" width="7" height="9" rx="1" transform="rotate(-5 5 6.5)"/>
+    <rect x="11.5" y="8.5" width="7" height="9" rx="1" transform="rotate(3 15 13)"/>
+    <rect x="21.5" y="2" width="7" height="9" rx="1" transform="rotate(5 25 6.5)"/>
+  </svg>
+}
+
 export default function DevelopChrome() {
-  const work = useDevelop(), { editor, entries, route, category } = work
+  const work = useDevelop(), { editor, entries, route, routeCards, activeCardId, category } = work
   const [panel, setPanel] = useState(null)
   const readonly = useValue('develop controls readonly', () => !editor || editor.getInstanceState().isReadonly, [editor])
   const saved = entries.filter(shape => shape.props.note)
@@ -25,15 +35,21 @@ export default function DevelopChrome() {
         {CATEGORIES.map((item, i) => <button key={item.id} className="esc-station-tab" aria-pressed={category === item.id} disabled={!editor} onClick={() => work.visit(item.id)} style={{ '--evidence-color': item.color }}><CategoryMark cardId={[1, 5, 9, 13][i]}/><span>{item.shortLabel}</span><b>10</b></button>)}
       </nav>
       <div className="esc-explore-actions dv-explore-actions">
-        <button onClick={() => setPanel('routes')} disabled={readonly} aria-label="Choose a curated route"><Icon name="arrow" size={16}/><span>Routes</span></button>
+        <button onClick={() => setPanel('routes')} disabled={readonly} aria-label="Choose a curated route"><RouteIcon/><span>Routes</span></button>
         <button onClick={() => setPanel('saved')} disabled={!editor} aria-label={`Scrapbook ${saved.length}`}><Icon name="book" size={17}/><span>Scrapbook</span><b>{saved.length}</b></button>
         <button className="esc-wander" onClick={draw} disabled={readonly}><Icon name="shuffle" size={17}/><span>Draw a card</span></button>
       </div>
     </div>
-    {route && <div className="dv-route-ribbon"><span><small>Your route</small><strong>{route.name}</strong></span><ol>{route.cardIds.map((id, i) => {
-      const card = CARDS.find(card => card.id === id), shapes = entries.filter(shape => shape.props.cardId === id), done = shapes.some(shape => shape.props.note)
-      return <li key={id}><button onClick={() => shapes.length ? work.openCard(shapes[0].id) : work.drawCard(id)} disabled={readonly && !shapes.length} className={done ? 'is-done' : ''}><b>{done ? '✓' : i + 1}</b><span>{card.title}</span></button></li>
-    })}</ol>{route.cardIds.every(id => entries.some(shape => shape.props.cardId === id && shape.props.note)) && <strong className="dv-route-done">A new direction. ✳</strong>}<button className="dv-icon-button" onClick={work.leaveRoute} disabled={readonly} aria-label="Leave route"><Icon name="close" size={16}/></button></div>}
+    {route && <div className="dv-route-ribbon">
+      <button className="dv-route-overview" onClick={work.showRoute} aria-label={`Show the whole ${route.name} route`}><RouteIcon/><span><small>Your route · {routeCards.filter(shape => shape?.props.note.trim()).length} / 4</small><strong>{route.name}</strong></span></button>
+      <ol aria-label="Route steps">{route.cardIds.map((id, i) => {
+        const card = CARDS.find(card => card.id === id), shape = routeCards[i], done = Boolean(shape?.props.note.trim())
+        return <li key={id}><button onClick={() => work.openRouteCard(i)} disabled={readonly && !shape} className={done ? 'is-done' : ''} aria-current={shape?.id === activeCardId ? 'step' : undefined}><b>{done ? '✓' : i + 1}</b><span>{card.title}</span></button></li>
+      })}</ol>
+      {routeCards.length === 4 && routeCards.every(shape => shape?.props.note.trim()) && <strong className="dv-route-done">A new direction. ✳</strong>}
+      <button className="dv-icon-button" onClick={work.leaveRoute} disabled={readonly} aria-label="Leave route"><Icon name="close" size={16}/></button>
+    </div>}
+
     {panel && <DevelopDialog title={panel === 'routes' ? 'Take a different route.' : 'The ideas worth keeping.'} close={() => setPanel(null)}>
       {panel === 'routes' ? <div className="dv-route-options">{CURATED_ROUTES.map((item, i) => <button key={item.id} onClick={() => { work.chooseRoute(item.id); setPanel(null) }} style={{ '--route-color': CATEGORIES[i % 4].color }}><span className="dv-route-number">0{i + 1} <span>4 cards</span></span><h3>{item.name}</h3><p>{item.purpose}</p><div>{item.cardIds.map(id => <CategoryMark key={id} cardId={id}/>)}<Icon name="arrow"/></div></button>)}</div>
         : <Scrapbook work={work} close={() => setPanel(null)}/>}
