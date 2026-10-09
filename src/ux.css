@@ -266,7 +266,7 @@ summary:focus-visible, select:focus-visible { outline: 2px solid var(--focus-rin
   .tabletop.is-arranged .tabletop-canvas { height: var(--arranged-height); min-height: 0; }
   .tabletop.is-arranged .tabletop-canvas > .table-card-shell { width: var(--arranged-card-width); }
   .tabletop.is-arranged .original-note { left: var(--note-x); top: var(--note-y); width: var(--note-width); height: var(--note-height); min-height: 0; transform: rotate(-1deg); display: flex; align-items: center; padding: 28px; }
-  .tabletop.is-arranged .original-note p { font-size: clamp(24px, 2.3vw, 34px); }
+  .tabletop.is-arranged .original-note p { min-height: 0; max-height: 100%; padding-bottom: .12em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; font-size: clamp(24px, 2.3vw, 34px); }
   .tabletop.is-arranged .tabletop-canvas .table-card-shell .card-front strong { font-size: clamp(17px, 1.5vw, 24px); line-height: 1.04; }
   .tabletop.is-arranged .tabletop-canvas .card-category { font-size: 11px; line-height: 1.3; }
 }

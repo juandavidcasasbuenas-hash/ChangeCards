@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Analytics } from '@vercel/analytics/react'
 import DesignPhase from './components/DesignPhase.jsx'
 import { FeedbackButton, FeedbackProvider } from './components/Feedback.jsx'
@@ -1959,10 +1959,56 @@ function Scrapbook({ idea, cards, notes, obscured, onClose, onOpenCard, onReorde
   )
 }
 
-function OriginalNote({ idea, compact = false, scrapbook = false }) {
+function OriginalNote({ idea, compact = false, scrapbook = false, fitPaper = false }) {
+  const paperRef = useRef(null)
+  const textRef = useRef(null)
+  const [scrollable, setScrollable] = useState(false)
+
+  useLayoutEffect(() => {
+    if (!fitPaper) {
+      setScrollable(false)
+      return undefined
+    }
+    const paper = paperRef.current
+    const text = textRef.current
+    let disposed = false
+    const fitText = () => {
+      if (disposed) return
+      text.style.removeProperty('font-size')
+      if (!paper.clientHeight) return
+      const paperStyle = getComputedStyle(paper)
+      const availableHeight = paper.clientHeight - parseFloat(paperStyle.paddingTop) - parseFloat(paperStyle.paddingBottom)
+      const overflows = () => text.scrollHeight > availableHeight || text.scrollWidth > text.clientWidth + 1
+      const maximum = parseFloat(getComputedStyle(text).fontSize)
+      // Measure real wrapping, including after web fonts load. Keep a readable
+      // minimum; longer ideas remain available in the paragraph's scroll area.
+      if (overflows()) {
+        let low = Math.min(16, Math.floor(maximum))
+        let high = Math.floor(maximum)
+        while (low < high) {
+          const size = Math.ceil((low + high) / 2)
+          text.style.fontSize = `${size}px`
+          if (overflows()) high = size - 1
+          else low = size
+        }
+        text.style.fontSize = `${low}px`
+      }
+      setScrollable(overflows())
+    }
+    fitText()
+    const observer = new ResizeObserver(fitText)
+    observer.observe(paper)
+    document.fonts.ready.then(fitText)
+    return () => {
+      disposed = true
+      observer.disconnect()
+      text.style.removeProperty('font-size')
+    }
+  }, [idea, fitPaper])
+
   return (
-    <aside className={`original-note ${compact ? 'compact' : ''} ${scrapbook ? 'scrapbook-origin' : ''}`}>
-      <p>{idea}</p>
+    <aside ref={paperRef} className={`original-note ${compact ? 'compact' : ''} ${scrapbook ? 'scrapbook-origin' : ''}`}>
+      <p ref={textRef} tabIndex={scrollable ? 0 : undefined} role={scrollable ? 'region' : undefined} aria-label={scrollable ? 'Your starting idea — scroll to read more' : undefined}>{idea}</p>
       <i aria-hidden="true" />
     </aside>
   )
@@ -2559,7 +2605,7 @@ function Tabletop({ session, update, activeCard: activeState, savedCards, openCa
       </div>
 
       <div className="tabletop-canvas" ref={canvasRef} style={{ '--arranged-height': `${arrangement.height}px`, '--arranged-card-width': `${arrangement.cardWidth}px`, '--note-x': `${arrangement.noteX}px`, '--note-y': `${arrangement.noteY}px`, '--note-width': `${arrangement.noteWidth}px`, '--note-height': `${arrangement.noteHeight}px` }}>
-        <OriginalNote idea={session.idea} />
+        <OriginalNote idea={session.idea} fitPaper={!layoutRoute} />
 
         {routesOpen && (
           <button
