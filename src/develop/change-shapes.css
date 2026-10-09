@@ -22,7 +22,7 @@
 .dvc-card:not([data-controls]) button, .dvc-card:not([data-controls]) textarea { pointer-events: none; }
 .dvc-card-meta { z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; min-height: 27px; font: 500 9px/1.25 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .04em; }
 .dvc-card-meta > span:first-child { max-width: 130px; }
-.dvc-card-meta > span:last-child { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; opacity: .75; }
+.dvc-card-meta > span:last-child:not(:first-child) { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; opacity: .75; }
 .dvc-card-art { display: grid; flex: 1 1 auto; min-height: 100px; place-items: center; padding: 6px 0 10px; }
 .dvc-doodle { display: block; width: 140px; height: 140px; flex: 0 0 auto; color: inherit; background: currentColor; -webkit-mask-image: var(--dvc-artwork); mask-image: var(--dvc-artwork); -webkit-mask-position: center; mask-position: center; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: contain; mask-size: contain; }
 .dvc-doodle-sprite { -webkit-mask-position: var(--dvc-artwork-position); mask-position: var(--dvc-artwork-position); -webkit-mask-size: 600% 400%; mask-size: 600% 400%; }

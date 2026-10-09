@@ -13,6 +13,9 @@ export const STATION_HEADER_H = 140
 const CARD_GAP = 30
 const knownCardIds = new Set(CARDS.map(card => card.id))
 
+// The anonymous identity is bookkeeping, not part of the card design.
+export const displayAuthorName = name => name && name !== 'Explorer' ? name : ''
+
 export function stationPosition(category) {
   const id = typeof category === 'object' ? category?.id : category
   const index = Math.max(0, CATEGORIES.findIndex(item => item.id === id))

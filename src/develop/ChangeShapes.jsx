@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BaseBoxShapeUtil, HTMLContainer, useEditor, useValue } from 'tldraw'
 import { changeCardProps, changeStationProps } from '../../shared/safari-shapes.mjs'
 import { CARDS, CATEGORIES, cardArtwork } from './catalog.js'
+import { displayAuthorName } from './model.js'
 import { useDevelop } from './develop-context.js'
 import './change-shapes.css'
 
@@ -92,7 +93,8 @@ function CardFace({ shape }) {
   const readonly = useValue('change card readonly', () => editor.getInstanceState().isReadonly, [editor])
   const controls = useValue('change card controls', () => ['select', 'hand'].includes(editor.getCurrentToolId()), [editor])
   const writable = !readonly && (context?.canWriteCard?.(shape) ?? true)
-  const { template, note, authorName, face } = shape.props
+  const { template, note, face } = shape.props
+  const authorName = displayAuthorName(shape.props.authorName)
   const drafting = Boolean(shape.meta.developDrafting || shape.props.draft || !note)
   const draft = shape.meta.developDrafting ? shape.props.draft : (shape.props.draft || note)
   const color = categoryById.get(card?.category)?.color || '#88abc3'
@@ -133,9 +135,9 @@ function CardFace({ shape }) {
     <article className={`dvc-card dvc-category-${card.category} ${face === 'back' && !template ? 'dvc-card-back' : 'dvc-card-front'}`}
       data-change-card={card.id} data-card-face={template ? 'front' : face} data-template={template || undefined}
       data-dealing={context?.deal?.shapeId === shape.id || undefined}
-      data-controls={controls || undefined} aria-label={`${card.title}${template ? ', Change Card' : `, ${authorName || 'your'} take`}`}
+      data-controls={controls || undefined} aria-label={`${card.title}${template ? ', Change Card' : authorName ? `, ${authorName}’s take` : ''}`}
       style={{ '--dvc-color': color, width: CARD_W, height: shape.props.h * CARD_W / shape.props.w, transform: `scale(${shape.props.w / CARD_W})` }}>
-      <header className="dvc-card-meta"><span>{card.label}</span><span>{template ? String(card.id).padStart(2, '0') : authorName || 'Your take'}</span></header>
+      <header className="dvc-card-meta"><span>{card.label}</span>{(template || authorName) && <span>{template ? String(card.id).padStart(2, '0') : authorName}</span>}</header>
       {face === 'front' || template ? <>
         <div className="dvc-card-art"><ChangeCardDoodle cardId={card.id}/></div>
         <h2>{card.title}</h2>
@@ -253,6 +255,7 @@ function SvgCard({ shape, artworkSrc }) {
   const card = cardById.get(shape.props.cardId)
   if (!card) return null
   const back = shape.props.face === 'back' && !shape.props.template
+  const authorName = displayAuthorName(shape.props.authorName)
   const color = categoryById.get(card.category).color
   const w = CARD_W, h = shape.props.h * CARD_W / shape.props.w
   const title = wrap(card.title.toUpperCase(), w - 44, back ? 23 : 34).slice(0, 4)
@@ -274,7 +277,7 @@ function SvgCard({ shape, artworkSrc }) {
     {back && question.map((line, i) => <text key={`question-${i}`} x="22" y={questionY + i * 19} fontSize="15" fontFamily="sans-serif" fill="#4d474b">{line}</text>)}
     {back && notes.slice(0, noteLines).map((line, i) => <text key={`note-${i}`} x="22" y={noteY + i * 21} fontSize="15" fontFamily="sans-serif" fill="#25212a">{line}{i === noteLines - 1 && notes.length > noteLines ? '…' : ''}</text>)}
     <line x1="22" x2={w - 22} y1={h - 44} y2={h - 44} stroke="#25212a" strokeOpacity=".2"/>
-    <text x="22" y={h - 20} fontSize="10" fontFamily="sans-serif" fill="#25212a">{back ? shape.props.authorName || 'Your take' : 'CHANGE CARDS'}</text>
+    {(!back || authorName) && <text x="22" y={h - 20} fontSize="10" fontFamily="sans-serif" fill="#25212a">{back ? authorName : 'CHANGE CARDS'}</text>}
   </g>
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useValue } from 'tldraw'
 import { CARDS, CATEGORIES, CURATED_ROUTES, cardArtwork } from './catalog.js'
+import { displayAuthorName } from './model.js'
 import { useDevelop } from './develop-context.js'
 import { changeCardMarkdown } from './canvas-actions.js'
 import { Icon } from '../safari/primitives.jsx'
@@ -74,6 +75,7 @@ function Scrapbook({ work, close }) {
   const [selectedIndex, setIndex] = useState(0), [message, setMessage] = useState('')
   const index = Math.min(selectedIndex, Math.max(0, entries.length - 1))
   const shape = entries[Math.min(index, entries.length - 1)], card = CARDS.find(card => card.id === shape?.props.cardId)
+  const authorName = displayAuthorName(shape?.props.authorName)
   const move = direction => {
     if (editor.getInstanceState().isReadonly) return
     const ids = entries.map(shape => shape.id), other = index + direction
@@ -85,8 +87,8 @@ function Scrapbook({ work, close }) {
   return <div className="dv-scrapbook" onKeyDown={event => { if (['TEXTAREA', 'SELECT', 'INPUT'].includes(event.target.tagName) || !entries.length) return; if (event.key === 'ArrowLeft') { event.preventDefault(); setIndex((index + entries.length - 1) % entries.length) } if (event.key === 'ArrowRight') { event.preventDefault(); setIndex((index + 1) % entries.length) } }}>
     {!shape ? <p>Write on a card and save your idea.<br/>It will be here when you need it.</p> : <>
       <nav aria-label="Saved ideas"><button onClick={() => setIndex((index + entries.length - 1) % entries.length)} aria-label="Previous saved idea">←</button><span>{index + 1} / {entries.length}</span><button onClick={() => setIndex((index + 1) % entries.length)} aria-label="Next saved idea">→</button></nav>
-      {entries.length > 1 && <select className="dv-saved-jump" aria-label="Jump to saved idea" value={index} onChange={event => setIndex(Number(event.target.value))}>{entries.map((item, i) => <option key={item.id} value={i}>{i + 1}. {CARDS.find(card => card.id === item.props.cardId)?.title}{item.props.authorName ? ` — ${item.props.authorName}` : ''}</option>)}</select>}
-      <article className={`dv-saved-card category-${card.category}`}><small>{card.label}</small><CategoryMark cardId={card.id}/><h3>{card.title}</h3><p className="dv-saved-prompt">{card.provocation}</p><p className="dv-saved-writing">{shape.props.note}</p>{shape.props.authorName && <small>{shape.props.authorName}</small>}</article>
+      {entries.length > 1 && <select className="dv-saved-jump" aria-label="Jump to saved idea" value={index} onChange={event => setIndex(Number(event.target.value))}>{entries.map((item, i) => <option key={item.id} value={i}>{i + 1}. {CARDS.find(card => card.id === item.props.cardId)?.title}{displayAuthorName(item.props.authorName) ? ` — ${item.props.authorName}` : ''}</option>)}</select>}
+      <article className={`dv-saved-card category-${card.category}`}><small>{card.label}</small><CategoryMark cardId={card.id}/><h3>{card.title}</h3><p className="dv-saved-prompt">{card.provocation}</p><p className="dv-saved-writing">{shape.props.note}</p>{authorName && <small>{authorName}</small>}</article>
       <div className="dv-saved-actions"><button onClick={() => { work.openCard(shape.id); close() }}>Open on canvas <Icon name="arrow" size={16}/></button><button onClick={() => copy(false)}>Copy idea</button><button onClick={() => copy(true)}>Copy all</button></div>
       <div className="dv-order-actions"><span>Scrapbook order</span><button disabled={!index} onClick={() => move(-1)}>Move earlier</button><button disabled={index === entries.length - 1} onClick={() => move(1)}>Move later</button></div>
       {message && <p role="status">{message}</p>}
