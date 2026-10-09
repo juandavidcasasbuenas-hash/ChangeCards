@@ -6,7 +6,7 @@ import { seenFindings, turnCard } from './card-reading.js'
 export const sid = id => createShapeId(`evidence-${id}`)
 export const ignorePointer = event => event.stopPropagation()
 export const canvasMotion = editor => ({ duration: editor.getContainerWindow().matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 320 })
-export const evidenceShapes = editor => editor.getCurrentPageShapes().filter(shape => shape.props.evidence?.card?.id)
+export const evidenceShapes = (editor, includeDevelop = false) => editor.getCurrentPageShapes().filter(shape => shape.props.evidence?.card?.id && (includeDevelop || !shape.meta.developmentSeed))
 
 export function focusShapes(editor, shapes, { animate = true } = {}) {
   const boxes = shapes.map(shape => editor.getShapePageBounds(shape.id)).filter(Boolean)
@@ -17,7 +17,7 @@ export function focusShapes(editor, shapes, { animate = true } = {}) {
 }
 
 export function visitStation(editor, lens, options) {
-  const shapes = editor.getCurrentPageShapes().filter(shape => lens === 'kept'
+  const shapes = editor.getCurrentPageShapes().filter(shape => !shape.type.startsWith('change-') && shape.meta.workshopStage !== 'develop' && shape.x < 5700).filter(shape => lens === 'kept'
     ? shape.meta.safariKept
     : lens === 'all' ? shape.type !== 'arrow' && shape.type !== 'draw'
       : shape.props.evidence?.card?.lens === lens || shape.props.lens === lens)
@@ -27,7 +27,7 @@ export function visitStation(editor, lens, options) {
 }
 
 export function wander(editor, options = {}) {
-  const shapes = evidenceShapes(editor)
+  const shapes = evidenceShapes(editor, Boolean(options.develop)).filter(shape => options.develop ? shape.meta.developmentSeed : !shape.meta.developmentSeed)
   const cards = [...new Map(shapes.map(shape => [shape.props.evidence.card.id, shape.props.evidence.card])).values()]
   const card = chooseFinding(cards, seenFindings(editor), options)
   if (card) turnCard(editor, shapes.find(shape => shape.props.evidence.card.id === card.id))
@@ -35,18 +35,18 @@ export function wander(editor, options = {}) {
 
 export function keepFinding(editor, cardId) {
   if (editor.getInstanceState().isReadonly) return
-  const shapes = evidenceShapes(editor).filter(shape => shape.props.evidence.card.id === cardId)
+  const shapes = evidenceShapes(editor, true).filter(shape => shape.props.evidence.card.id === cardId)
   const kept = !shapes.some(shape => shape.meta.safariKept)
   editor.markHistoryStoppingPoint('keep-finding')
   editor.updateShapes(shapes.map(shape => ({ id: shape.id, type: shape.type, meta: { ...shape.meta, safariKept: kept } })))
 }
 
-export function addNote(editor, text = '') {
+export function addNote(editor, text = '', stage = 'discover') {
   if (editor.getInstanceState().isReadonly) return
   const { x, y } = editor.getViewportPageBounds().center
   const id = createShapeId()
   editor.markHistoryStoppingPoint('add-field-note')
-  editor.createShape({ id, type: 'note', x: x - 100, y: y - 90,
+  editor.createShape({ id, type: 'note', x: x - 100, y: y - 90, meta: { workshopStage: stage },
     props: { color: 'yellow', size: 'm', font: 'draw', richText: toRichText(text) } })
   editor.setCurrentTool('select').select(id)
   if (!text) editor.setEditingShape(id)

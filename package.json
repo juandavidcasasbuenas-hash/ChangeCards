@@ -20,7 +20,8 @@
     "verify:ux": "node scripts/verify-ux.mjs",
     "verify:coop:live": "node scripts/verify-coop-live.mjs",
     "dev:safari-sync": "wrangler dev --config workers/safari-sync/wrangler.jsonc --local --port 8792",
-    "deploy:safari-sync": "wrangler deploy --config workers/safari-sync/wrangler.jsonc"
+    "deploy:safari-sync": "wrangler deploy --config workers/safari-sync/wrangler.jsonc",
+    "test:develop": "node --test --test-force-exit tests/develop*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

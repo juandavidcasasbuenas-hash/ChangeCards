@@ -14,10 +14,10 @@ export default {
     const url = new URL(request.url), origin = request.headers.get('Origin')
     const allowed = (env.ALLOWED_ORIGINS || '').split(',').includes(origin)
     if (origin && !allowed) return json({ error: 'This website cannot access the board.' }, 403)
-    const cors = { 'Access-Control-Allow-Origin': origin || '', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', Vary: 'Origin' }
+    const cors = { 'Access-Control-Allow-Origin': origin || '', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', Vary: 'Origin' }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
     if (url.pathname === '/health') return json({ ok: true, protocol: 'tldraw-5.4.2' })
-    const match = url.pathname.match(/^\/rooms\/([^/]+)(?:\/(ticket|connect))?$/)
+    const match = url.pathname.match(/^\/rooms\/([^/]+)(?:\/(ticket|connect|research))?$/)
     if (!match || !ROOM_ID.test(match[1])) return json({ error: 'Board not found.' }, 404)
     if (request.method === 'PUT' && (!env.SAFARI_SYNC_SECRET || bearer(request) !== env.SAFARI_SYNC_SECRET)) return json({ error: 'Not authorized.' }, 403)
     try {
@@ -37,6 +37,7 @@ export class SafariRoom extends DurableObject {
     super(ctx, env)
     ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS safari_metadata (id INTEGER PRIMARY KEY, key_hash TEXT NOT NULL, safari TEXT NOT NULL)')
     ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS safari_tickets (ticket TEXT PRIMARY KEY, expires INTEGER NOT NULL)')
+    ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS safari_research_leases (id INTEGER PRIMARY KEY CHECK (id = 1), owner TEXT NOT NULL, expires INTEGER NOT NULL)')
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"type":"ping"}', '{"type":"pong"}'))
   }
   metadata() { return this.ctx.storage.sql.exec('SELECT * FROM safari_metadata WHERE id = 1').toArray()[0] }
@@ -69,6 +70,7 @@ export class SafariRoom extends DurableObject {
     if (!metadata) return json({ error: 'This board does not exist. Check the invite link.' }, 404)
     if (url.pathname.endsWith('/connect')) return this.connect(request, url)
     if (await hash(bearer(request)) !== metadata.key_hash) return json({ error: 'This invite link is invalid. Ask for a new copy of the link.' }, 403)
+    if (url.pathname.endsWith('/research') && ['POST', 'DELETE'].includes(request.method)) return this.research(request)
     if (request.method === 'GET' && /^\/rooms\/[^/]+$/.test(url.pathname)) return json({ safari: JSON.parse(metadata.safari) })
     if (request.method === 'POST' && url.pathname.endsWith('/ticket')) {
       if (this.ctx.getWebSockets().length >= 20) return json({ error: 'This board has 20 people connected. Try again when someone leaves.' }, 429)
@@ -78,6 +80,29 @@ export class SafariRoom extends DurableObject {
       return json({ ticket })
     }
     return json({ error: 'Unsupported request.' }, 405)
+  }
+  async research(request) {
+    let ownerId
+    try {
+      const body = await request.text()
+      if (byteSize(body) > 2048) throw Error('Request too large.')
+      ownerId = JSON.parse(body).ownerId
+      if (typeof ownerId !== 'string' || ownerId.length > 100 || !ROOM_ID.test(ownerId)) throw Error('Invalid owner.')
+    } catch { return json({ error: 'Invalid research session. Please try again.' }, 400) }
+    // There is no await between reading and reserving. All requests to this
+    // room are handled by one Durable Object, so simultaneous starts cannot
+    // both reserve the research slot before making a paid provider request.
+    const sql = this.ctx.storage.sql
+    if (request.method === 'DELETE') {
+      const released = sql.exec('DELETE FROM safari_research_leases WHERE id = 1 AND owner = ? RETURNING id', ownerId).toArray().length > 0
+      return json({ ok: true, released })
+    }
+    const now = Date.now()
+    const lease = sql.exec('SELECT owner, expires FROM safari_research_leases WHERE id = 1').toArray()[0]
+    if (lease && lease.owner !== ownerId && lease.expires > now) return json({ error: 'Someone is already gathering evidence for this table.' }, 409)
+    const expiresAt = now + 10 * 60 * 1000
+    sql.exec('INSERT INTO safari_research_leases VALUES (1, ?, ?) ON CONFLICT (id) DO UPDATE SET owner = excluded.owner, expires = excluded.expires', ownerId, expiresAt)
+    return json({ ok: true, ownerId, expiresAt })
   }
   async create(request, roomId) {
     if (Number(request.headers.get('Content-Length')) > MAX_BOARD_BYTES + 1000) return json({ error: 'This board is too large to share.' }, 400)

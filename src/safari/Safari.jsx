@@ -52,7 +52,7 @@ export default function Safari() {
   }, [printCards])
 
   const updateSafari = (id, update) => setLibrary(old => ({ ...old, safaris: old.safaris.map(s => s.id === id ? { ...s, ...update(s) } : s) }))
-  const addSafari = (data, destination = 'board') => {
+  const addSafari = (data, destination = 'canvas') => {
     setLibrary(old => mergeSafari(old, data))
     setActiveId(null); setModal(null); setView(destination)
   }
@@ -110,7 +110,7 @@ export default function Safari() {
     } catch (err) { setError(err.message) } finally { setBusy(false) }
   }
   const openRecent = id => {
-    const destination = library.safaris.find(s => s.id === id)?.preferredView === 'canvas' ? 'canvas' : 'board'
+    const destination = 'canvas'
     setLibrary(old => ({ ...old, currentId: id, safaris: old.safaris.map(s => s.id === id && s.status === 'researching' ? { ...s, status: 'partial' } : s) }))
     setActiveId(null); setError(''); setToast(''); setView(destination)
   }
@@ -128,7 +128,7 @@ export default function Safari() {
       <button className="sf-brand" onClick={goHome} aria-label="Evidence Safari home"><span>EVIDENCE</span><span>SAFARI<span className="sf-brand-star">✳</span></span></button>
       <DesignPhase stage="discover" />
       <nav aria-label="Safari navigation">
-        {view === 'home' ? <a className="sf-text-button sf-change-link" href="/">Change Cards <Icon name="arrow" size={15}/></a> : view === 'board' && <>
+        {view === 'board' && <>
           <button className="sf-text-button sf-new" onClick={goHome}><Icon name="plus" size={16}/><span>New safari</span></button>
           <button className="sf-guide-button" onClick={() => setModal('guide')}><Icon name="book" size={19}/><span>Field guide</span><b>{saved.length}</b></button>
         </>}

@@ -1,3 +1,4 @@
+import { CARDS } from '../../develop/catalog.js'
 import { LENSES } from '../discovery.js'
 import { cardMarkdown } from '../field-guide.js'
 
@@ -84,14 +85,14 @@ export function canvasFieldNotes(safari, shapes, bindings = []) {
   const findings = new Map()
   const nameOf = id => {
     const shape = byId.get(id)
-    return shape?.props?.evidence?.card?.title || richTextPlainText(shape?.props?.richText) || shape?.props?.name || 'Canvas annotation'
+    return (shape?.type === 'change-card' ? CARDS.find(card => card.id === shape.props.cardId)?.title : null) || shape?.props?.evidence?.card?.title || richTextPlainText(shape?.props?.richText) || shape?.props?.name || 'Canvas annotation'
   }
   for (const shape of shapes) {
     const evidence = shape.props?.evidence
     if (evidence?.card?.id) findings.set(evidence.card.id, evidence)
   }
-  let output = `# Evidence Safari — canvas field notes\n\n${safari.challenge}\n\n`
-  const annotations = shapes.filter(shape => ['text', 'note', 'frame'].includes(shape.type) && !shape.meta?.safariScaffolding)
+  let output = `# ${shapes.some(shape => shape.type === 'change-card') ? 'Discover & Develop — workshop notes' : 'Evidence Safari — canvas field notes'}\n\n${safari.challenge}\n\n`
+  const annotations = shapes.filter(shape => ['text', 'note', 'frame'].includes(shape.type) && !shape.meta?.safariScaffolding && !shape.meta?.startingIdea)
   if (annotations.length) {
     output += '## Notes and groups\n\n'
     for (const shape of annotations) {
@@ -111,6 +112,7 @@ export function canvasFieldNotes(safari, shapes, bindings = []) {
     }
     output += '\n'
   }
+  if (!findings.size) return output
   output += '## Evidence and original sources\n\n'
   for (const { card, source } of findings.values()) output += cardMarkdown(card, source)
   return output + '\nEvidence was checked by an AI model against search extracts. Full texts have not been independently verified. Connections across settings are hypotheses, not proof.\n'

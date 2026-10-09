@@ -3,6 +3,7 @@ import { useEditor, useValue } from 'tldraw'
 import { cardMarkdown, copyText, evidenceLabel } from '../field-guide.js'
 import { Doodle, Icon } from '../primitives.jsx'
 import { LENS_COLORS, safeSourceUrl } from './model.js'
+import { useSafariCanvas } from './canvas-context.js'
 import { closeReading, markFindingSeen, readingSession, turnCard } from './card-reading.js'
 import { evidenceShapes, ignorePointer, keepFinding, wander } from './canvas-actions.js'
 
@@ -17,10 +18,12 @@ export default function EvidenceReader() {
 
 function Reader({ editor, shape }) {
   const { card, source } = shape.props.evidence
+  const { stage, buildOnFinding, setStage } = useSafariCanvas()
+  const readonly = useValue('evidence writing available', () => editor.getInstanceState().isReadonly, [editor])
   const dialog = useRef(null)
   const closeButton = useRef(null)
   const [copied, setCopied] = useState('')
-  const peers = useValue('available findings', () => evidenceShapes(editor), [editor])
+  const peers = useValue('available findings', () => evidenceShapes(editor, true).filter(item => stage === 'develop' ? item.meta.developmentSeed : !item.meta.developmentSeed), [editor, stage])
   const sameLens = peers.filter(item => item.props.evidence.card.lens === card.lens)
     .sort((a, b) => (a.meta.safariSlot || 0) - (b.meta.safariSlot || 0))
   const index = sameLens.findIndex(item => item.id === shape.id)
@@ -67,9 +70,10 @@ function Reader({ editor, shape }) {
         </div>
       </div>
       <footer className="esc-reader-actions">
-        <button className={`esc-keep ${kept ? 'is-kept' : ''}`} aria-pressed={kept} onClick={() => keepFinding(editor, card.id)}><Icon name={kept ? 'check' : 'bookmark'} size={17}/>{kept ? 'Kept' : 'Keep this'}</button>
+        {stage === 'discover' ? <button className="dv-build" disabled={readonly} onClick={() => { closeReading(editor); buildOnFinding(shape) }}>Build on this<Icon name="arrow" size={16}/></button> : <button className="dv-build" onClick={() => { closeReading(editor); setStage('discover') }}>Back to evidence<Icon name="arrow" size={16}/></button>}
+        <button className={`esc-keep ${kept ? 'is-kept' : ''}`} aria-pressed={kept} disabled={readonly} onClick={() => keepFinding(editor, card.id)}><Icon name={kept ? 'check' : 'bookmark'} size={17}/>{kept ? 'Kept' : 'Keep this'}</button>
         <button className="esc-next-find" disabled={sameLens.length < 2} onClick={next}>Next in {card.lens}<Icon name="arrow" size={17}/></button>
-        <button className="esc-detour" onClick={() => wander(editor, { avoidLens: card.lens, currentId: card.id })} disabled={!peers.some(item => item.props.evidence.card.lens !== card.lens)} aria-label="Take a detour to another perspective" title="Take a detour"><Icon name="shuffle" size={19}/></button>
+        <button className="esc-detour" onClick={() => wander(editor, { avoidLens: card.lens, currentId: card.id, develop: stage === 'develop' })} disabled={!peers.some(item => item.props.evidence.card.lens !== card.lens)} aria-label="Take a detour to another perspective" title="Take a detour"><Icon name="shuffle" size={19}/></button>
       </footer>
     </div>
   </dialog>

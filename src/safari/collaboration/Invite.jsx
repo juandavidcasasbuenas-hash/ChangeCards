@@ -8,7 +8,7 @@ import { linkFor, newSession, readIdentity, readResponse, rememberedSession, rem
 import './sharing.css'
 
 export default function Invite({ editor }) {
-  const { safari, run, collaboration, activeLens } = useSafariCanvas()
+  const { safari, run, collaboration, activeLens, stage } = useSafariCanvas()
   const [open, setOpen] = useState(() => Boolean(collaboration?.showInvite))
   const people = useValue('people at this table', () => editor ? editor.getCollaborators() : [], [editor])
   if (run?.busy || safari.status === 'researching') return null
@@ -17,10 +17,10 @@ export default function Invite({ editor }) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M19 7v8m-4-4h8"/></svg><span>Invite</span>
       {collaboration && <b className="esc-people-count" aria-label={`${people.length + 1} people on the board`}>{people.length + 1}</b>}
     </button>
-    {open && <InviteDialog editor={editor} safari={safari} collaboration={collaboration} activeLens={activeLens} people={people} onClose={() => setOpen(false)}/>}
+    {open && <InviteDialog editor={editor} safari={safari} collaboration={collaboration} activeLens={activeLens} stage={stage} people={people} onClose={() => setOpen(false)}/>}
   </>
 }
-function InviteDialog({ editor, safari, collaboration, activeLens, people, onClose }) {
+function InviteDialog({ editor, safari, collaboration, activeLens, stage, people, onClose }) {
   const ref = useRef(null)
   const [name, setName] = useState(() => readIdentity()?.name || '')
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [copied, setCopied] = useState(false)
@@ -38,7 +38,7 @@ function InviteDialog({ editor, safari, collaboration, activeLens, people, onClo
         body: JSON.stringify({ ...board, roomId: pending.roomId, key: pending.key }), signal: AbortSignal.timeout(30000) }))
       const created = { ...pending, server: result.server, ready: true }
       rememberSession(safari.id, created); saveIdentity(name); setSession(created)
-      try { sessionStorage.setItem(`evidence-safari.handoff:${created.roomId}`, JSON.stringify({ camera: editor.getCamera(), activeLens, openInvite: true })) } catch {}
+      try { sessionStorage.setItem(`evidence-safari.handoff:${created.roomId}`, JSON.stringify({ camera: editor.getCamera(), activeLens, stage, openInvite: true })) } catch {}
       location.assign(linkFor(created))
     } catch (err) { setError(err.message); setBusy(false) }
   }
@@ -48,7 +48,7 @@ function InviteDialog({ editor, safari, collaboration, activeLens, people, onClo
   return <dialog ref={ref} className="esc-invite-dialog" aria-labelledby="esc-invite-title" onCancel={event => { if (busy) event.preventDefault(); else onClose() }}
     onClick={event => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <header><span className="esc-share-spark" aria-hidden="true">✳</span><button onClick={onClose} disabled={busy} aria-label="Close invite"><Icon name="close"/></button></header>
-    <h2 id="esc-invite-title">A little company<br/>on the safari.</h2>
+    <h2 id="esc-invite-title">A little company<br/>{stage === 'develop' ? 'at the table.' : 'on the safari.'}</h2>
     <p>{session ? 'Anyone with this link can explore and edit this board.' : 'Bring someone onto this board. Your finds, notes and connections come with you.'}</p>
     {session ? <>
       <label className="esc-invite-link">Invite link<input aria-label="Invite link" readOnly value={linkFor(session)} onFocus={event => event.target.select()}/></label>

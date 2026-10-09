@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
+    { "source": "/develop", "destination": "/index.html" },
+    { "source": "/develop/", "destination": "/index.html" },
     { "source": "/safari/session/:roomId", "destination": "/index.html" },
     { "source": "/safari/field-table", "destination": "/index.html" },
     { "source": "/safari/field-table/", "destination": "/index.html" },

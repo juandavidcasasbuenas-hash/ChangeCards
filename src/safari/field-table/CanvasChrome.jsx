@@ -11,6 +11,10 @@ import { useSafariCanvas } from './canvas-context.js'
 import { addNote, evidenceShapes, ignorePointer, tidyStation, visitStation, wander } from './canvas-actions.js'
 import { turnCard } from './card-reading.js'
 import Invite from '../collaboration/Invite.jsx'
+import { useDevelop } from '../../develop/develop-context.js'
+import { developMarkdown, showDevelop, collectDevelopEntries } from '../../develop/canvas-actions.js'
+import { CARDS } from '../../develop/catalog.js'
+import { FeedbackButton } from '../../components/Feedback.jsx'
 
 function ToolIcon({ name, size = 19 }) {
   const paths = {
@@ -24,16 +28,17 @@ function ToolIcon({ name, size = 19 }) {
 }
 
 export function CanvasHeader({ editor }) {
-  const { safari, run, activeLens } = useSafariCanvas()
+  const { safari, run, activeLens, stage, setStage } = useSafariCanvas()
+  const develop = useDevelop()
   const [toast, setToast] = useState('')
   const exportMenu = useRef(null)
-  const shapes = useValue('exportable table', () => editor ? evidenceShapes(editor) : [], [editor])
+  const shapes = useValue('exportable table', () => editor ? evidenceShapes(editor, true) : [], [editor])
   const readonly = useValue('table editing available', () => !editor || editor.getInstanceState().isReadonly, [editor])
   const kept = [...new Map(shapes.filter(shape => shape.meta.safariKept).map(shape => [shape.props.evidence.card.id, shape])).values()]
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 3500); return () => clearTimeout(timer) }, [toast])
   const notes = () => {
     const all = editor.getCurrentPageShapes()
-    return canvasFieldNotes(safari, all, all.flatMap(shape => shape.type === 'arrow' ? editor.getBindingsFromShape(shape.id, 'arrow') : []))
+    return canvasFieldNotes(safari, all, all.flatMap(shape => shape.type === 'arrow' ? editor.getBindingsFromShape(shape.id, 'arrow') : [])) + (all.some(shape => shape.type === 'change-card') ? '\n' + developMarkdown(editor, safari.challenge) : '')
   }
   const copy = async (onlyKept = false) => {
     try {
@@ -43,15 +48,17 @@ export function CanvasHeader({ editor }) {
     exportMenu.current.open = false
   }
   return <header className="esc-header">
-    <button className="esc-brand" onClick={() => run?.onHome ? run.onHome() : location.assign('/safari/')} aria-label="Evidence Safari home"><span>EVIDENCE<br/>SAFARI<span className="esc-brand-star">✳</span></span></button>
-    <DesignPhase stage="discover"/>
+    <button className="esc-brand" onClick={() => run?.onHome ? run.onHome() : location.assign(stage === 'develop' ? '/develop' : '/safari/')} aria-label={stage === 'develop' ? 'Change Cards home' : 'Evidence Safari home'}><span>{stage === 'develop' ? 'CHANGE' : 'EVIDENCE'}<br/>{stage === 'develop' ? 'CARDS' : 'SAFARI'}<span className="esc-brand-star">✳</span></span></button>
+    <DesignPhase stage={stage} onChange={setStage}/>
     <details className="esc-question"><summary><span><small>The question we came with</small><strong>{safari.challenge}</strong></span><Icon name="down" size={16}/></summary><p>{safari.challenge}</p></details>
     <Invite editor={editor}/>
     <details className="esc-export" ref={exportMenu}><summary aria-label="Export"><Icon name="download" size={16}/><span>Export</span></summary>
-      <div className="esc-export-menu"><button disabled={!editor} onClick={() => copy()}>Copy all finds & notes<Icon name="copy" size={16}/></button>
+      <div className="esc-export-menu"><button disabled={!editor} onClick={() => copy()}>Copy the whole workshop<Icon name="copy" size={16}/></button>
         <button disabled={!kept.length} onClick={() => copy(true)}>Copy kept finds ({kept.length})<Icon name="bookmark" size={16}/></button>
         <button disabled={!editor} onClick={() => { downloadGuide(notes(), safari.challenge); exportMenu.current.open = false }}>Download field notes<Icon name="download" size={16}/></button>
-        <hr/><button disabled={readonly || run?.busy || activeLens === 'kept'} onClick={() => { tidyStation(editor, activeLens); exportMenu.current.open = false; setToast('Evidence tidied. Undo will put it back.') }}>Tidy {activeLens === 'all' ? 'the evidence' : activeLens}<Icon name="shuffle" size={16}/></button>
+        <hr/>{stage === 'discover' && <button disabled={readonly || run?.busy || activeLens === 'kept'} onClick={() => { tidyStation(editor, activeLens); exportMenu.current.open = false; setToast('Evidence tidied. Undo will put it back.') }}>Tidy {activeLens === 'all' ? 'the evidence' : activeLens}<Icon name="shuffle" size={16}/></button>}
+        {stage === 'develop' && <div className="dv-board-actions"><button disabled={readonly} onClick={() => { for (const card of CARDS) if (!collectDevelopEntries(editor).some(shape => shape.props.cardId === card.id)) develop.drawCard(card.id); develop.visit('table'); exportMenu.current.open = false }}>Deal all 40 cards<Icon name="plus" size={16}/></button><button disabled={readonly} onClick={() => { editor.markHistoryStoppingPoint('return-unused'); editor.deleteShapes(collectDevelopEntries(editor).filter(shape => !shape.props.note && !shape.props.draft).map(shape => shape.id)); showDevelop(editor); exportMenu.current.open = false }}>Return unused cards<Icon name="shuffle" size={16}/></button><button onClick={() => { develop.visit('all'); exportMenu.current.open = false }}>See the whole catalogue<Icon name="arrow" size={16}/></button></div>}
+        <FeedbackButton/>
         {safari.timing && <small>{formatDuration(safari.timing.totalMs)} · estimated API cost ${(safari.cost?.estimatedUsd || 0).toFixed(3)}</small>}
       </div>
     </details>
@@ -96,19 +103,20 @@ export function CanvasProgress() {
     <div className="esc-progress-bottom"><span className="esc-progress-trails" aria-label={`${new Set(safari.cards.map(card => card.lens)).size} of six perspectives on the table`}>{LENSES.map(lens => <i key={lens} title={`${lens}: ${trailStatus(lens, run.progress, run.busy)}`} className={safari.cards.some(card => card.lens === lens) ? 'has-finds' : ''} style={{ '--trail-color': LENS_COLORS[lens] }}/>)}</span>
       {run.busy && <time aria-label="Elapsed time">{formatDuration(Math.max(0, now - run.startedAt))}</time>}
       {count > 0 && run.busy && <button className="esc-latest" onClick={() => { const last = evidenceShapes(editor).at(-1); if (last) turnCard(editor, last) }}>See latest<Icon name="arrow" size={14}/></button>}
-      {run.busy && <button className="esc-stop" onClick={count ? run.onStop : run.onHome}>{count ? 'Stop here' : 'Cancel'}</button>}
+      {run.busy && (run.onStop || run.onHome) && <button className="esc-stop" onClick={run.onStop || run.onHome}>{count ? 'Stop here' : 'Cancel'}</button>}
     </div>
   </div>
 }
 
 export function CanvasToolbar() {
   const editor = useEditor()
+  const { stage } = useSafariCanvas()
   const tool = useValue('active table tool', () => editor.getCurrentToolId(), [editor])
   const readonly = useValue('table is read only', () => editor.getInstanceState().isReadonly, [editor])
   const canUndo = useValue('can undo', () => editor.getCanUndo(), [editor])
   const canRedo = useValue('can redo', () => editor.getCanRedo(), [editor])
   return <div className="esc-tools" role="toolbar" aria-label="Work with your evidence" onPointerDown={ignorePointer}>
-    {[['select', 'Move'], ['hand', 'Pan'], ['note', 'Note'], ['arrow', 'Connect'], ['draw', 'Draw']].map(([id, label]) => <button key={id} disabled={readonly && !['select', 'hand'].includes(id)} aria-label={id === 'note' ? 'Add a note' : label} aria-pressed={tool === id} title={label} onClick={() => id === 'note' ? addNote(editor) : editor.setCurrentTool(id)}><ToolIcon name={id}/><span>{label}</span></button>)}
+    {[['select', 'Move'], ['hand', 'Pan'], ['note', 'Note'], ['arrow', 'Connect'], ['draw', 'Draw']].map(([id, label]) => <button key={id} disabled={readonly && !['select', 'hand'].includes(id)} aria-label={id === 'note' ? 'Add a note' : label} aria-pressed={tool === id} title={label} onClick={() => id === 'note' ? addNote(editor, '', stage) : editor.setCurrentTool(id)}><ToolIcon name={id}/><span>{label}</span></button>)}
     <span className="esc-tool-divider"/>
     <button className="esc-history" disabled={readonly || !canUndo} onClick={() => editor.undo()} aria-label="Undo" title="Undo"><ToolIcon name="undo" size={17}/></button>
     <button className="esc-history esc-redo" disabled={readonly || !canRedo} onClick={() => editor.redo()} aria-label="Redo" title="Redo"><ToolIcon name="redo" size={17}/></button>
@@ -118,16 +126,16 @@ export function CanvasToolbar() {
 
 export function CanvasNavigation() {
   const editor = useEditor()
-  const { setActiveLens, setShelf } = useSafariCanvas()
+  const { setActiveLens, setShelf, stage } = useSafariCanvas()
   const zoom = useValue('table zoom', () => Math.round(editor.getZoomLevel() * 100), [editor])
   return <div className="esc-navigation" onPointerDown={ignorePointer}>
     <button onClick={() => editor.zoomOut()} aria-label="Zoom out"><ToolIcon name="minus" size={16}/></button><span>{zoom}%</span><button onClick={() => editor.zoomIn()} aria-label="Zoom in"><ToolIcon name="plus" size={16}/></button>
-    <button className="esc-home-view" title="Back to the whole table" aria-label="Show the whole table" onClick={() => { setActiveLens('all'); setShelf(false); visitStation(editor, 'all') }}><ToolIcon name="fit" size={16}/></button>
+    <button className="esc-home-view" title="Back to the whole table" aria-label="Show the whole table" onClick={() => { setActiveLens('all'); setShelf(false); if (stage === 'develop') showDevelop(editor); else visitStation(editor, 'all') }}><ToolIcon name="fit" size={16}/></button>
   </div>
 }
 
 export function CanvasStylePanel(props) {
   const editor = useEditor()
-  const needed = useValue('show drawing styles', () => ['draw', 'arrow', 'note', 'text', 'geo'].includes(editor.getCurrentToolId()) || editor.getSelectedShapes().some(shape => !shape.props.evidence && shape.type !== 'safari-station'), [editor])
+  const needed = useValue('show drawing styles', () => ['draw', 'arrow', 'note', 'text', 'geo'].includes(editor.getCurrentToolId()) || editor.getSelectedShapes().some(shape => !shape.props.evidence && !['safari-station', 'change-card', 'change-station'].includes(shape.type)), [editor])
   return needed ? <DefaultStylePanel {...props}/> : null
 }

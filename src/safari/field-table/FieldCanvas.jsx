@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BaseBoxShapeUtil, HTMLContainer, Tldraw, createShapeId, toRichText, useEditor, useValue } from 'tldraw'
 import { evidenceProps, sourceProps, stationProps } from '../../../shared/safari-shapes.mjs'
 import { linkFor, rememberedSession } from '../collaboration/session-client.js'
@@ -13,6 +13,13 @@ import { closeReading, readingSession, setPrivateReading, turnCard } from './car
 import { ignorePointer, sid, visitStation } from './canvas-actions.js'
 import { CanvasHeader, StationNav, CanvasProgress, CanvasToolbar, CanvasNavigation, CanvasStylePanel } from './CanvasChrome.jsx'
 import EvidenceReader from './EvidenceReader.jsx'
+import { CHANGE_SHAPES } from '../../develop/ChangeShapes.jsx'
+import { DevelopContext } from '../../develop/develop-context.js'
+import { useDevelopController } from '../../develop/useDevelopController.js'
+import { initializeDevelop, buildFromEvidence, showDevelop } from '../../develop/canvas-actions.js'
+import { rememberBoard } from '../../develop/storage.js'
+import { useDiscoveryResearch } from '../../develop/useDiscoveryResearch.js'
+import DevelopChrome from '../../develop/DevelopChrome.jsx'
 import 'tldraw/tldraw.css'
 import './field-table.css'
 
@@ -109,7 +116,7 @@ class StationShapeUtil extends TrailShapeUtil {
   toSvg(shape) { return <text x={20} y={72} fontSize={44} fontWeight={700} fill="#262329">{shape.props.lens}</text> }
 }
 
-export const SAFARI_SHAPES = [EvidenceShapeUtil, SourceShapeUtil, TrailShapeUtil, StationShapeUtil]
+export const SAFARI_SHAPES = [EvidenceShapeUtil, SourceShapeUtil, TrailShapeUtil, StationShapeUtil, ...CHANGE_SHAPES]
 const COMPONENTS = { MenuPanel: null, TopPanel: null, QuickActions: null, ActionsMenu: null, PageMenu: null,
   Toolbar: CanvasToolbar, NavigationPanel: CanvasNavigation, StylePanel: CanvasStylePanel }
 
@@ -217,9 +224,15 @@ export default function FieldCanvas({ safari, run = null }) {
   return <CanvasSurface safari={safari} run={run}/>
 }
 
-export function CanvasSurface({ safari, run = null, store = null, collaboration = null }) {
-  const legacy = useRef(null), latest = useRef(safari), untouched = useRef(true)
+export function CanvasSurface({ safari: initialSafari, run: outerRun = null, store = null, collaboration = null }) {
+  const legacy = useRef(null), latest = useRef(initialSafari), untouched = useRef(true), cameras = useRef({})
   const [editor, setEditor] = useState(null)
+  const [stage, updateStage] = useState(() => collaboration?.stage || initialSafari.defaultStage || (initialSafari.kind === 'develop' ? 'develop' : 'discover'))
+  const currentStage = useRef(stage)
+  currentStage.current = stage
+  const research = useDiscoveryResearch({ editor, collaboration, safari: initialSafari, appendEvidence, seedCanvas: (editor, safari) => seedCanvas(editor, safari, readTable(safari)) })
+  const safari = research.researchSafari || initialSafari
+  const run = research.run ? { ...outerRun, ...research.run } : outerRun
   const [activeLens, updateActiveLens] = useState('all'), [shelf, setShelf] = useState(false)
   latest.current = safari
   if (!legacy.current) legacy.current = readTable(safari)
@@ -227,7 +240,36 @@ export function CanvasSurface({ safari, run = null, store = null, collaboration 
     untouched.current = false; updateActiveLens(lens)
     if (editor && !collaboration) editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
   }, [editor, collaboration])
-  const context = useMemo(() => ({ safari, run, activeLens, setActiveLens, shelf, setShelf, collaboration }), [safari, run, activeLens, setActiveLens, shelf, collaboration])
+  const setStage = useCallback((next, { focus = true } = {}) => {
+    if (!editor || editor.isDisposed) return
+    if (next === 'develop' && editor.getInstanceState().isReadonly && !editor.getCurrentPage().meta.developInitialized) return
+    untouched.current = false
+    closeReading(editor); setShelf(false)
+    cameras.current[stage] = editor.getCamera()
+    if (next === 'develop') {
+      initializeDevelop(editor, { challenge: safari.challenge, legacy: safari.legacy })
+      try { rememberBoard({ ...safari, defaultStage: 'develop' }) } catch { /* Native canvas persistence remains available. */ }
+    } else if (!editor.getCurrentPage().meta.safariSeedComplete && !editor.getInstanceState().isReadonly) seedCanvas(editor, { ...safari, cards: [], sources: [] }, readTable(safari))
+    updateStage(next)
+    if (!collaboration) { const page = editor.getCurrentPage(); editor.run(() => editor.updatePage({ id: page.id, meta: { ...page.meta, workshopStage: next } }), { history: 'ignore' }) }
+    if (!focus) return
+    requestAnimationFrame(() => {
+      if (editor.isDisposed) return
+      if (cameras.current[next]) editor.setCamera(cameras.current[next])
+      else if (next === 'develop') showDevelop(editor)
+      else visitStation(editor, activeLens)
+    })
+  }, [editor, stage, safari, collaboration, activeLens])
+  const develop = useDevelopController({ editor, safari, collaboration, setStage })
+  const buildOnFinding = useCallback(shape => {
+    if (!editor || editor.getInstanceState().isReadonly) return
+    initializeDevelop(editor, { challenge: safari.challenge })
+    buildFromEvidence(editor, shape)
+    setStage('develop')
+    requestAnimationFrame(() => { if (!editor.isDisposed) showDevelop(editor) })
+  }, [editor, safari.challenge, setStage])
+  const context = { safari: { ...safari, defaultStage: stage }, run, activeLens, setActiveLens, shelf, setShelf, collaboration, stage, setStage, buildOnFinding }
+  const findings = useValue('discovery available', () => editor?.getCurrentPageShapes().filter(shape => shape.props.evidence && !shape.meta.developmentSeed).length || 0, [editor])
   useEffect(() => {
     if (!editor || editor.isDisposed || !collaboration) return
     const offline = collaboration.status !== 'online'
@@ -237,40 +279,61 @@ export function CanvasSurface({ safari, run = null, store = null, collaboration 
     return () => window.removeEventListener('beforeunload', warn)
   }, [editor, collaboration?.status])
   useEffect(() => {
-    if (!editor || editor.isDisposed || collaboration) return
+    if (!editor || editor.isDisposed || collaboration || research.researchSafari || !editor.getCurrentPage().meta.safariSeedComplete) return
     const { additions, first } = appendEvidence(editor, safari)
     if (first && additions.length && untouched.current) {
       const lens = additions[0].lens; updateActiveLens(lens); visitStation(editor, lens)
       editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
     }
-  }, [editor, safari, collaboration])
+  }, [editor, safari, collaboration, research.researchSafari])
   const mounted = useCallback(editor => {
     const safari = latest.current
     setEditor(editor)
+    const stopCreates = editor.sideEffects.registerBeforeCreateHandler('shape', (shape, source) => {
+      if (source !== 'user' || shape.meta.workshopStage || shape.meta.safariScaffolding || shape.type.startsWith('safari-') || shape.type.startsWith('change-')) return shape
+      return { ...shape, meta: { ...shape.meta, workshopStage: currentStage.current } }
+    })
     if (collaboration) {
       setPrivateReading(editor, collaboration.session.roomId)
       editor.user.updateUserPreferences({ colorScheme: 'light', isSnapMode: true })
       requestAnimationFrame(() => {
         if (editor.isDisposed) return
         if (collaboration.camera) { editor.setCamera(collaboration.camera); updateActiveLens(collaboration.activeLens || 'all') }
+        else if (stage === 'develop') showDevelop(editor, 'table', { animate: false })
         else {
           const lens = LENSES.find(name => editor.getCurrentPageShapes().some(shape => shape.props.evidence?.card?.lens === name)) || 'all'
           updateActiveLens(lens); visitStation(editor, lens, { animate: false })
         }
       })
-      return editor.sideEffects.registerAfterDeleteHandler('shape', shape => { if (readingSession(editor).get()?.shapeId === shape.id) closeReading(editor) })
+      const stopDeletes = editor.sideEffects.registerAfterDeleteHandler('shape', shape => { if (readingSession(editor).get()?.shapeId === shape.id) closeReading(editor) })
+      return () => { stopCreates(); stopDeletes() }
     }
-    updateActiveLens(editor.getCurrentPage().meta.safariActiveLens || 'all')
+    const page = editor.getCurrentPage()
+    const requestedStage = ['discover', 'develop'].includes(safari.defaultStage) ? safari.defaultStage : null
+    const savedStage = ['discover', 'develop'].includes(page.meta.workshopStage) ? page.meta.workshopStage : null
+    const openingStage = requestedStage || savedStage || currentStage.current
+    const focusRequestedStage = Boolean(requestedStage && requestedStage !== savedStage)
+    currentStage.current = openingStage
+    updateStage(openingStage)
+    updateActiveLens(page.meta.safariActiveLens || 'all')
     editor.user.updateUserPreferences({ colorScheme: 'light', isSnapMode: true })
     const shapes = editor.getCurrentPageShapes()
     const migration = sourceCardMigration(shapes, shapes.flatMap(shape => shape.type === 'arrow' ? editor.getBindingsFromShape(shape.id, 'arrow') : []))
     editor.run(() => { editor.updateBindings(migration.bindings); editor.deleteShapes(migration.removeIds); editor.updateShapes(migration.compact) }, { history: 'ignore' })
-    if (seedCanvas(editor, safari, legacy.current)) requestAnimationFrame(() => {
-      if (editor.isDisposed) return
-      const lens = LENSES.find(name => safari.cards.some(card => card.lens === name)) || 'all'
-      updateActiveLens(lens); visitStation(editor, lens, { animate: false })
-      editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
-    })
+    if (openingStage === 'develop') {
+      const fresh = initializeDevelop(editor, { challenge: safari.challenge, legacy: safari.legacy })
+      if (fresh || focusRequestedStage) requestAnimationFrame(() => { if (!editor.isDisposed) showDevelop(editor, 'table', { animate: false }) })
+    }
+    if (openingStage === 'discover') {
+      const fresh = seedCanvas(editor, safari, legacy.current)
+      if (fresh || focusRequestedStage) requestAnimationFrame(() => {
+        if (editor.isDisposed) return
+        const lens = (!fresh && page.meta.safariActiveLens) || LENSES.find(name => safari.cards.some(card => card.lens === name)) || 'all'
+        updateActiveLens(lens); visitStation(editor, lens, { animate: false })
+        editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, safariActiveLens: lens } }), { history: 'ignore' })
+      })
+    }
+    if (editor.getCurrentPage().meta.workshopStage !== openingStage) editor.run(() => editor.updatePage({ id: editor.getCurrentPageId(), meta: { ...editor.getCurrentPage().meta, workshopStage: openingStage } }), { history: 'ignore' })
     const stopChanges = editor.sideEffects.registerBeforeChangeHandler('shape', (previous, next, source) => {
       if (source === 'user' && !updatingCanvas.has(editor) && previous.meta.safariScaffolding && JSON.stringify(previous.props.richText) !== JSON.stringify(next.props.richText)) return { ...next, meta: { ...next.meta, safariScaffolding: false } }
       return next
@@ -279,14 +342,15 @@ export function CanvasSurface({ safari, run = null, store = null, collaboration 
     const container = editor.getContainer()
     const interact = () => { untouched.current = false }
     for (const event of ['pointerdown', 'wheel', 'keydown']) container.addEventListener(event, interact, { passive: true })
-    return () => { stopChanges(); stopDeletes(); for (const event of ['pointerdown', 'wheel', 'keydown']) container.removeEventListener(event, interact) }
+    return () => { stopCreates(); stopChanges(); stopDeletes(); for (const event of ['pointerdown', 'wheel', 'keydown']) container.removeEventListener(event, interact) }
   }, [])
-  return <SafariCanvasContext.Provider value={context}><div className="esc-workbench" data-research-busy={Boolean(run?.busy)}>
-    <CanvasHeader editor={editor}/><StationNav editor={editor}/>
+  return <SafariCanvasContext.Provider value={context}><DevelopContext.Provider value={{ ...develop, safari }}><div className="esc-workbench" data-workshop-stage={stage} data-research-busy={Boolean(run?.busy)}>
+    <CanvasHeader editor={editor}/>{stage === 'develop' ? <DevelopChrome/> : <StationNav editor={editor}/>}
     <div className="esc-stage">
       {collaboration && collaboration.status !== 'online' && <div className="esc-sync-status" role="status">{collaboration.problem || (collaboration.status === 'loading' ? 'Connecting to the shared table…' : collaboration.status === 'error' ? 'The connection needs a refresh. Copy your notes before reopening.' : 'Reconnecting… Keep this tab open until your changes have synced.')}</div>}
       <Tldraw shapeUtils={SAFARI_SHAPES} components={COMPONENTS} options={OPTIONS} {...(store ? { store } : { persistenceKey: CANVAS_KEY + safari.id })} onMount={mounted} licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY} inferDarkMode={false}>
       <CanvasProgress/><EvidenceReader/>
+      {stage === 'discover' && !findings && editor && !run?.busy && <div className="dv-empty-discover"><span aria-hidden="true">✳</span><h2>What could change<br/>how you see this?</h2><p>Follow six perspectives on your idea.<br/>Keep the findings here, alongside your work.</p><button onClick={research.start}>Find evidence <Icon name="arrow" size={17}/></button>{research.run?.error && <p role="alert">{research.run.error}</p>}</div>}
     </Tldraw></div>
-  </div></SafariCanvasContext.Provider>
+  </div></DevelopContext.Provider></SafariCanvasContext.Provider>
 }

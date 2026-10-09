@@ -2,16 +2,17 @@ import React, { lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import './ux.css'
+import { FeedbackProvider } from './components/Feedback.jsx'
 
 const App = lazy(() => /^\/safari\/session\//.test(window.location.pathname)
   ? import('./safari/collaboration/SharedSafari.jsx')
   : /^\/safari\/field-table\/?$/.test(window.location.pathname)
   ? import('./safari/field-table/FieldTable.jsx')
   : /^\/safari(?:\/|$)/.test(window.location.pathname)
-    ? import('./safari/Safari.jsx') : import('./App.jsx'))
+    ? import('./safari/Safari.jsx') : new URLSearchParams(location.search).has('room') ? import('./App.jsx') : import('./develop/DevelopApp.jsx'))
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Suspense fallback={<div role="status" style={{ padding: 40 }}>Opening…</div>}><App /></Suspense>
+    <FeedbackProvider><Suspense fallback={<div role="status" style={{ padding: 40 }}>Opening…</div>}><App /></Suspense></FeedbackProvider>
   </React.StrictMode>,
 )
