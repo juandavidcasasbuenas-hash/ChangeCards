@@ -22,6 +22,7 @@ function Reader({ editor, shape }) {
   const [copied, setCopied] = useState('')
   const peers = useValue('available findings', () => evidenceShapes(editor), [editor])
   const sameLens = peers.filter(item => item.props.evidence.card.lens === card.lens)
+    .sort((a, b) => (a.meta.safariSlot || 0) - (b.meta.safariSlot || 0))
   const index = sameLens.findIndex(item => item.id === shape.id)
   const kept = peers.some(item => item.props.evidence.card.id === card.id && item.meta.safariKept)
   const sourceUrl = safeSourceUrl(source?.url)
